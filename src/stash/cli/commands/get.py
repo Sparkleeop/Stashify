@@ -39,10 +39,53 @@ async def _get_async(
 
     manifest = store.load_manifest(file_id)
 
+    # Decrypt filename
+    crypto = CryptoEngine()
+    enc_config = EncryptionConfig(
+        algorithm=manifest.encryption.algorithm,
+        key_size=manifest.encryption.key_size,
+        nonce_size=manifest.encryption.nonce_size,
+        chunk_key_derivation=manifest.encryption.chunk_key_derivation,
+    )
+    file_key = None
+    try:
+        if manifest.encryption.file_key_wrapped:
+            from stash.core.crypto import FileKey
+            file_key = FileKey(
+                key=crypto.decrypt_file_key(
+                    manifest.encryption.file_key_wrapped,
+                    password,
+                    manifest.encryption.file_key_salt,
+                    enc_config
+                ).key,
+                salt=manifest.encryption.file_key_salt,
+                config=enc_config
+            )
+        else:
+            print_error("File key not wrapped - cannot decrypt")
+            return
+    except Exception as e:
+        print_error(f"Failed to decrypt file key: {e}")
+        return
+
+    # Decrypt filename
+    from stash.core.crypto import EncryptedChunk
+    encrypted_name_bytes = bytes.fromhex(manifest.encrypted_name)
+    encrypted_name_chunk = EncryptedChunk(
+        ciphertext=encrypted_name_bytes,
+        nonce=manifest.encrypted_name_nonce,
+        chunk_index=-1,
+    )
+    try:
+        decrypted_name = crypto.decrypt_chunk(encrypted_name_chunk, file_key).decode()
+    except Exception as e:
+        print_error(f"Failed to decrypt filename: {e}")
+        return
+
     if output is None:
-        output_path = Path.cwd() / manifest.original_name
+        output_path = Path.cwd() / decrypted_name
     elif output.is_dir():
-        output_path = output / manifest.original_name
+        output_path = output / decrypted_name
     else:
         output_path = output
 
@@ -130,7 +173,7 @@ async def _get_async(
     for instance in provider_instances.values():
         await instance.close()
 
-    print_success(f"Retrieved '{manifest.original_name}' to {output_path}")
+    print_success(f"Retrieved '{decrypted_name}' to {output_path}")
     print_info(f"Size: {format_size(manifest.original_size)}")
 
 

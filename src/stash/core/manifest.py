@@ -47,6 +47,8 @@ class FileManifest:
     """Complete manifest for a stored file."""
     file_id: str
     original_name: str
+    encrypted_name: str
+    encrypted_name_nonce: bytes
     original_size: int
     chunk_size: int
     chunk_count: int
@@ -104,6 +106,8 @@ class ManifestBuilder:
     """Helper to build a FileManifest incrementally."""
     file_id: str
     original_name: str
+    encrypted_name: str
+    encrypted_name_nonce: bytes
     original_size: int
     chunk_size: int
     encryption: EncryptionInfo
@@ -139,6 +143,8 @@ class ManifestBuilder:
         return FileManifest(
             file_id=self.file_id,
             original_name=self.original_name,
+            encrypted_name=self.encrypted_name,
+            encrypted_name_nonce=self.encrypted_name_nonce,
             original_size=self.original_size,
             chunk_size=self.chunk_size,
             chunk_count=len(self.chunks),

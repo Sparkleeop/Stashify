@@ -73,9 +73,11 @@ class DiscordProvider(BaseStorageProvider):
             raise ProviderError("Rate limit semaphore not initialized")
 
         async with self._rate_limit_semaphore:
-            filename = f"{remote_path}-chunk-{chunk.index:06d}.bin"
+            # Use opaque filename: just chunk index, no original filename
+            filename = f"chunk-{chunk.index:06d}.bin"
             files = {"file": (filename, chunk.data, "application/octet-stream")}
-            data = {"content": f"stash-chunk:{remote_path}:{chunk.index}"}
+            # Message content only contains chunk index for identification, no file path
+            data = {"content": f"stash-chunk:{chunk.index}"}
 
             response = await self._client.post(
                 f"/channels/{self.channel_id}/messages",
@@ -108,10 +110,8 @@ class DiscordProvider(BaseStorageProvider):
             remote_id=attachment["id"],
             metadata={
                 "message_id": data["id"],
-                "filename": attachment["filename"],
                 "size": str(attachment["size"]),
                 "chunk_index": str(chunk_index),
-                "remote_path": remote_path,
             },
         )
 
@@ -182,6 +182,9 @@ class DiscordProvider(BaseStorageProvider):
         before_id: str | None = None
         limit = 100
 
+        # prefix is now the file_id
+        search_prefix = f"stash-chunk:"
+
         while True:
             params: dict[str, str | int] = {"limit": limit}
             if before_id:
@@ -203,19 +206,21 @@ class DiscordProvider(BaseStorageProvider):
 
             for msg in messages:
                 content = msg.get("content", "")
-                if content.startswith(f"stash-chunk:{prefix}:"):
-                    for attachment in msg.get("attachments", []):
-                        refs.append(RemoteRef(
-                            provider="discord",
-                            remote_id=attachment["id"],
-                            metadata={
-                                "message_id": msg["id"],
-                                "filename": attachment["filename"],
-                                "size": str(attachment["size"]),
-                                "chunk_index": content.split(":")[-1],
-                                "remote_path": prefix,
-                            },
-                        ))
+                if content.startswith(search_prefix):
+                    # Extract chunk index from content: "stash-chunk:123"
+                    parts = content.split(":")
+                    if len(parts) >= 2:
+                        chunk_index = parts[1]
+                        for attachment in msg.get("attachments", []):
+                            refs.append(RemoteRef(
+                                provider="discord",
+                                remote_id=attachment["id"],
+                                metadata={
+                                    "message_id": msg["id"],
+                                    "size": str(attachment["size"]),
+                                    "chunk_index": chunk_index,
+                                },
+                            ))
 
             if len(messages) < limit:
                 break

@@ -77,6 +77,12 @@ async def _put_async(
     file_key = crypto.generate_file_key()
     wrapped_key = crypto.encrypt_file_key(file_key, password)
 
+    # Encrypt the filename
+    from stash.core.crypto import EncryptedChunk
+    encrypted_name_chunk = crypto.encrypt_chunk(file_path.name.encode(), file_key, -1)
+    encrypted_name = encrypted_name_chunk.ciphertext.hex()
+    encrypted_name_nonce = encrypted_name_chunk.nonce
+
     provider_configs = {}
     for name in provider_names:
         config = store.get_provider_config(name)
@@ -111,6 +117,8 @@ async def _put_async(
     builder = ManifestBuilder(
         file_id=generate_file_id(),
         original_name=file_path.name,
+        encrypted_name=encrypted_name,
+        encrypted_name_nonce=encrypted_name_nonce,
         original_size=file_size,
         chunk_size=effective_chunk_size,
         encryption=encryption_info,
@@ -130,7 +138,8 @@ async def _put_async(
 
     async def upload_chunk(chunk: Chunk, provider_name: str) -> None:
         async with semaphores[provider_name]:
-            remote_path = f"{builder.file_id}/{file_path.name}"
+            # Use opaque identifier: file_id + chunk index (no filename)
+            remote_path = f"{builder.file_id}/chunk-{chunk.index:06d}"
             remote_ref = await provider_instances[provider_name].upload_chunk(chunk, remote_path)
             checksum = compute_checksum(chunk.data)
             builder.add_chunk(
