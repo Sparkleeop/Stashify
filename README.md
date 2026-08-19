@@ -1,242 +1,658 @@
-# Stash
+# Stashify
 
-**An open-source, privacy-focused command-line storage system that uses third-party platforms as encrypted storage backends.**
+<p align="center">
+  <strong>Encrypted storage. Your providers. Your keys.</strong>
+</p>
 
----
+<p align="center">
+  An open-source, privacy-focused storage system that turns third-party platforms into encrypted storage backends.
+</p>
 
-## What is Stash?
-
-Stash is a storage abstraction layer. It lets you store files on external services — Telegram, Discord, and eventually S3, Backblaze B2, Google Drive, local filesystem, WebDAV, and others — while keeping all encryption strictly client-side.
-
-Stash is **not** a cloud storage provider. It is a CLI tool that turns interchangeable storage backends into a unified, encrypted filesystem-like experience.
-
-```
-                    Stash CLI
-                        |
-              Storage abstraction
-                        |
-        +---------------+---------------+
-        |                               |
-    Telegram                          Discord
-     backend                           backend
-        |                               |
-   encrypted chunks                 encrypted chunks
-```
+<p align="center">
+  <a href="https://github.com/Sparkleeop/Stashify">
+    <img src="https://img.shields.io/github/stars/Sparkleeop/Stashify?style=flat-square" alt="GitHub Stars">
+  </a>
+  <a href="https://github.com/Sparkleeop/Stashify">
+    <img src="https://img.shields.io/github/license/Sparkleeop/Stashify?style=flat-square" alt="License">
+  </a>
+  <img src="https://img.shields.io/badge/Python-3.12+-3776AB?style=flat-square&logo=python&logoColor=white" alt="Python">
+  <img src="https://img.shields.io/badge/Status-Early%20Development-ee8695?style=flat-square" alt="Status">
+</p>
 
 ---
 
-## Why Stash?
+## What is Stashify?
 
-| Problem | Stash Approach |
-|---------|----------------|
-| Vendor lock-in | Provider-agnostic abstraction |
-| No client-side encryption in most platforms | Encrypt locally, upload ciphertext only |
-| Single point of failure | Distribute chunks across multiple providers |
-| Manual chunk/message management | Automatic chunking, upload, metadata, resumption |
-| Platform-specific limits | Chunking adapts to each provider's constraints |
+**Stashify** is an open-source, provider-agnostic storage system designed around one simple idea:
+
+> **Your storage provider shouldn't have to be your storage system.**
+
+Stashify lets you use services such as **Telegram and Discord as storage backends**, while encryption and file management remain under your control.
+
+Files are encrypted locally, split into chunks, and uploaded as ciphertext. Chunks can be stored on one provider or distributed across multiple providers depending on your configuration.
+
+```text
+                         STASHIFY
+                            │
+                     Storage Engine
+                            │
+              ┌─────────────┴─────────────┐
+              │                           │
+          Encryption                  Chunking
+              │                           │
+              └─────────────┬─────────────┘
+                            │
+                     Storage Router
+                            │
+              ┌─────────────┴─────────────┐
+              │                           │
+          Telegram                     Discord
+              │                           │
+       encrypted chunks            encrypted chunks
+```
+
+Stashify does **not** provide the underlying storage.
+
+It provides the abstraction that lets you use storage you already have access to.
 
 ---
 
-## Core Architecture
+## Why Stashify?
 
-### Client-Side Encryption
+Traditional cloud storage usually means trusting one provider with both your data and your storage.
 
-Files are encrypted **before** they leave your device.
+Stashify separates those concepts.
 
+| Problem                    | Stashify                              |
+| -------------------------- | ------------------------------------- |
+| Vendor lock-in             | Provider-agnostic storage abstraction |
+| Provider sees plaintext    | Files are encrypted before upload     |
+| Large files                | Automatic chunking                    |
+| Provider-specific limits   | Provider-aware chunking and routing   |
+| Single provider dependency | Multi-provider storage                |
+| Interrupted uploads        | Resumable operations                  |
+| Manual file management     | Unified CLI/TUI                       |
+| Provider-specific APIs     | One consistent interface              |
+
+---
+
+## Features
+
+### Client-side encryption
+
+Your files are encrypted **before they leave your device**.
+
+```text
+                    YOUR DEVICE
+                         │
+                    Plaintext
+                         │
+                         ▼
+                    Encryption
+                         │
+                         ▼
+                      Chunking
+                         │
+                         ▼
+               Encrypted ciphertext
+                         │
+              ┌──────────┴──────────┐
+              ▼                     ▼
+          Telegram               Discord
 ```
-plaintext → Stash (encrypt + chunk) → ciphertext chunks → providers
+
+Storage providers should only receive ciphertext.
+
+Stashify is designed around:
+
+* Client-side encryption
+* Authenticated encryption (AEAD)
+* Per-file cryptographic keys
+* Proper key derivation
+* Cryptographically secure randomness
+* No custom cryptographic primitives
+* Authenticated chunk integrity
+* Local key management
+
+Stashify uses established cryptographic libraries rather than implementing cryptography from scratch.
+
+> **Security note:** Stashify does not claim that multi-provider storage makes encryption stronger. Confidentiality comes from the cryptographic design and key management. Multi-provider storage primarily provides distribution, redundancy, and provider independence.
+
+---
+
+### Chunked storage
+
+Large files are automatically split into manageable chunks.
+
+```text
+movie.mkv
+    │
+    ▼
+ encrypted data
+    │
+    ▼
+┌────────┬────────┬────────┬────────┐
+│ chunk0 │ chunk1 │ chunk2 │ chunk3 │
+└────────┴────────┴────────┴────────┘
+    │         │        │        │
+    ▼         ▼        ▼        ▼
+ encrypted encrypted encrypted encrypted
 ```
 
-- Providers only ever receive authenticated ciphertext
-- Established cryptographic libraries (no custom primitives)
-- Per-file encryption keys with proper key derivation
-- Authenticated encryption (AEAD) for every chunk
-- Optional double-encryption mode (whole-file + per-chunk)
+Each chunk is independently tracked and authenticated.
 
-**Security claims are conservative:** encryption and key management provide confidentiality. Multi-provider distribution provides redundancy and availability — not additional cryptographic security.
+The storage engine can account for provider-specific upload limitations without exposing those implementation details to the rest of the application.
 
-### File Chunking
+---
 
-Large files are split into chunks to accommodate provider-specific size limits.
+### Multi-provider storage
 
-```
-original file
-     |
-     v
-encrypt → chunk → chunk 0, chunk 1, chunk 2, ...
-```
+Stashify can distribute a file across multiple storage providers.
 
-Each chunk is independently encrypted and tracked. Metadata (manifest) describes how to reconstruct the file.
+For example:
 
-### Multi-Provider Storage
-
-A single file's chunks can be distributed across providers.
-
-| Strategy | Description |
-|----------|-------------|
-| **Single** | All chunks on one provider |
-| **Split** | Chunks distributed across providers (0→Telegram, 1→Discord, …) |
-| **Balanced** | Dynamic distribution based on availability/performance |
-| **Replicated** | Each chunk stored on multiple providers for redundancy |
-
-```
+```text
 100 encrypted chunks
 
-Telegram:  0, 2, 4, 6, 8, ...
-Discord:   1, 3, 5, 7, 9, ...
+Telegram:
+  0  2  4  6  8  10  12  ...
+
+Discord:
+  1  3  5  7  9  11  13  ...
 ```
 
-Even if an attacker obtains **all chunks from every provider**, the data remains protected by the encryption design.
+Multiple storage strategies are planned:
 
-### Provider Abstraction
+| Strategy       | Description                                           |
+| -------------- | ----------------------------------------------------- |
+| **Single**     | Store all chunks on one provider                      |
+| **Split**      | Distribute chunks across multiple providers           |
+| **Balanced**   | Dynamically distribute chunks based on provider state |
+| **Replicated** | Store copies across multiple providers                |
 
-The core engine knows nothing about Telegram or Discord specifics.
-
-```
-Storage Provider (interface)
-    |
-    +-- Telegram
-    +-- Discord
-    +-- S3 / B2 / GDrive / Local / WebDAV (planned)
-    +-- Future providers
-```
-
-New providers implement a clean interface. The storage engine remains unchanged.
-
-### Asynchronous & Resumable
-
-- Bounded concurrent workers for uploads/downloads
-- Retries with exponential backoff
-- Provider-aware rate limiting
-- Progress reporting
-- Cancellation support
-- **Resumable operations**: if 75/100 chunks uploaded, interruption resumes at chunk 75
-
-```
-Upload Queue
-     |
-+----+----+----+
-|    |    |    |
-W1   W2   W3   W4  (bounded workers)
-|    |    |    |
-TG   DC   TG   S3  (providers)
-```
-
-### Manifest & Local Metadata
-
-Each stored file has a manifest containing:
-
-- File ID, original name, size
-- Chunk size, count, encryption params
-- Chunk indexes → provider assignments → remote identifiers
-- Integrity verification data
-
-Local metadata stored in SQLite (initially).
+This allows Stashify to build storage around the providers available to you instead of forcing you into a single backend.
 
 ---
 
-## Basic Usage
+### Provider abstraction
+
+Providers are implementations of the same storage interface.
+
+```text
+                    Storage Provider
+                           │
+          ┌────────────────┼────────────────┐
+          │                │                │
+      Telegram          Discord          S3 / B2
+          │                │                │
+          └────────────────┼────────────────┘
+                           │
+                     Storage Engine
+```
+
+The core engine does not need to know how Telegram or Discord works.
+
+This makes it possible to add new providers without rewriting the storage system.
+
+Planned providers include:
+
+* S3-compatible storage
+* Backblaze B2
+* Google Drive
+* Local filesystem
+* WebDAV
+* Other community-built providers
+
+---
+
+### Asynchronous transfers
+
+Stashify is designed around asynchronous I/O.
+
+Large uploads can consist of hundreds or thousands of chunks, so operations should run concurrently with bounded workers.
+
+```text
+                    Upload Queue
+                         │
+             ┌───────────┼───────────┐
+             ▼           ▼           ▼
+          Worker 1    Worker 2    Worker 3
+             │           │           │
+          Telegram     Discord     Telegram
+```
+
+The transfer system is designed to support:
+
+* Concurrent uploads
+* Concurrent downloads
+* Bounded concurrency
+* Retries
+* Exponential backoff
+* Provider-aware rate limiting
+* Cancellation
+* Progress reporting
+* Failed-job tracking
+* Resumable operations
+
+---
+
+### Resumable uploads
+
+Interrupted transfers shouldn't mean starting from zero.
+
+```text
+200 chunks
+
+chunk 000   ✓
+chunk 001   ✓
+chunk 002   ✓
+...
+chunk 147   ✓
+chunk 148   ✗
+chunk 149   ✗
+...
+```
+
+Stashify keeps track of individual chunks so completed work can be preserved across interruptions.
+
+---
+
+### Integrity verification
+
+Encrypted chunks are authenticated and tracked using local metadata.
+
+Stashify is designed to detect:
+
+* Missing chunks
+* Corrupted chunks
+* Modified ciphertext
+* Incomplete downloads
+* Invalid manifests
+* Incorrect chunk ordering
+* Failed reconstruction
+
+The final reconstructed file can also be verified against file-level integrity information.
+
+---
+
+### Manifest-based storage
+
+Every stored file has a manifest describing how it can be reconstructed.
+
+Conceptually:
+
+```text
+File
+├── ID
+├── Original name
+├── Original size
+├── Chunk size
+├── Chunk count
+├── Encryption metadata
+├── Integrity information
+│
+└── Chunks
+    ├── 0 → Telegram → remote ID
+    ├── 1 → Discord  → remote ID
+    ├── 2 → Telegram → remote ID
+    └── ...
+```
+
+Local metadata is stored in SQLite.
+
+---
+
+# Terminal UI
+
+Stashify is designed to have a full interactive terminal interface rather than being limited to traditional commands.
+
+Run:
 
 ```bash
-# Initialize repository
-stash init
-
-# Add providers
-stash provider add telegram
-stash provider add discord
-
-# List configured providers
-stash provider list
-
-# Store a file
-stash put ./movie.mkv
-
-# List stored files
-stash ls
-
-# Show file metadata
-stash info movie.mkv
-
-# Retrieve a file
-stash get movie.mkv
-
-# Remove a file
-stash rm movie.mkv
-
-# Verify integrity (local metadata + remote)
-stash verify movie.mkv
-
-# Repair missing chunks from replicas (planned)
-stash repair movie.mkv
-
-# Overall status
-stash status
+stashify
 ```
 
-The user never manages individual messages, attachments, chunks, or encryption metadata.
+to launch the TUI.
+
+The interface is designed around a keyboard-first workflow with:
+
+* Local file explorer
+* Remote storage explorer
+* Multi-file selection
+* Upload/download controls
+* Live transfer progress
+* Provider status
+* Transfer queue
+* Provider management
+* Configuration
+* Search
+* Command palette
+* Keyboard shortcuts
+
+Conceptually:
+
+```text
+┌──────────────────────────────────────────────────────────────────────┐
+│ STASHIFY                                      Telegram ● Discord ●    │
+├──────────────────────────────┬───────────────────────────────────────┤
+│ LOCAL                        │ REMOTE STORAGE                         │
+│                              │                                       │
+│ ~/                           │ Stash                                 │
+│                              │                                       │
+│ > Documents/                 │ > Documents/                           │
+│   Downloads/                 │   Projects/                            │
+│   Pictures/                  │   Backups/                             │
+│                              │                                       │
+│ [x] project.zip              │ project.zip    2.4 GB    T+D    ✓     │
+│ [ ] README.md                │ backup.tar     14 GB     T      ✓     │
+│ [ ] photo.png                │ movie.mkv      8.1 GB    T+D    ✓     │
+│                              │                                       │
+├──────────────────────────────┴───────────────────────────────────────┤
+│ TRANSFERS                                                            │
+│ project.zip  ↑ 78%  ███████████████░░░░  Telegram + Discord         │
+├──────────────────────────────────────────────────────────────────────┤
+│ ↑↓ Navigate   Tab Pane   Space Select   U Upload   D Download   ?    │
+└──────────────────────────────────────────────────────────────────────┘
+```
+
+The TUI and traditional CLI share the same underlying storage engine.
 
 ---
 
-## Provider Support
+# CLI
 
-| Provider | Status | Notes |
-|----------|--------|-------|
-| Telegram | Initial | Bot API, channel/group storage |
-| Discord | Initial | Bot/user token, channel attachments |
-| S3-compatible | Planned | AWS S3, MinIO, R2, etc. |
-| Backblaze B2 | Planned | Native B2 API |
-| Google Drive | Planned | OAuth, Drive API |
-| Local filesystem | Planned | Directory backend |
-| WebDAV | Planned | Generic WebDAV servers |
+Stashify can also be used without the interactive interface.
 
-**Important:** Stash does not provide "unlimited storage." Actual limits, rate limits, file-size restrictions, and policies depend entirely on each provider. Stash adapts to those constraints via chunking and provider-specific logic.
+```bash
+# Initialize
+stashify init
 
----
+# Configure providers
+stashify provider add telegram
+stashify provider add discord
 
-## Security & Privacy Philosophy
+# List providers
+stashify provider list
 
-- **Local-first encryption**: Plaintext never leaves your device
-- **No custom crypto**: Established libraries (e.g., `cryptography`, `libsodium` bindings)
-- **Minimal trust**: Providers are untrusted storage buckets
-- **Transparency**: Open source, auditable code paths
-- **Provider independence**: No single provider can compromise your data
-- **Conservative claims**: We describe what the cryptography actually guarantees
+# Upload
+stashify put ./movie.mkv
 
----
+# List stored files
+stashify ls
 
-## Project Status
+# Inspect a file
+stashify info movie.mkv
 
-**Early development.** Core architecture, provider abstraction, encryption model, and CLI structure are being designed and implemented.
+# Download
+stashify get movie.mkv
 
-| Area | Status |
-|------|--------|
-| CLI framework | In progress |
-| Provider abstraction | In progress |
-| Telegram backend | In progress |
-| Discord backend | Planned |
-| Encryption/chunking | In progress |
-| Manifest/metadata | In progress |
-| Async job engine | In progress |
-| Resumable uploads | Planned |
-| Multi-provider strategies | Planned |
-| Verification/repair | Future |
+# Delete
+stashify rm movie.mkv
 
-Features described as "planned" or "future" are not yet implemented. This README will be updated as milestones land.
+# Verify
+stashify verify movie.mkv
+
+# Check status
+stashify status
+```
+
+The exact command set may evolve during development.
 
 ---
 
-## Contributing
+# Provider Support
 
-We welcome contributions — especially new storage providers, core improvements, testing, and documentation.
+| Provider         | Status         |
+| ---------------- | -------------- |
+| Telegram         | In development |
+| Discord          | Planned        |
+| S3-compatible    | Planned        |
+| Backblaze B2     | Planned        |
+| Google Drive     | Planned        |
+| Local filesystem | Planned        |
+| WebDAV           | Planned        |
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+Provider availability and capabilities are subject to the APIs, limits, and policies of the respective services.
+
+### About "unlimited storage"
+
+Stashify does **not** provide unlimited storage.
+
+It does not bypass provider limits or guarantee unlimited capacity.
+
+Actual storage capacity, file-size limits, rate limits, retention policies, and availability depend on the underlying provider.
+
+Stashify's job is to abstract those providers and make the best use of the storage available to the user.
 
 ---
 
-## License
+# Security & Privacy
 
-MIT License. See [LICENSE](LICENSE) for details.
+Stashify is designed around a simple trust model:
+
+```text
+             Trusted
+                │
+                ▼
+          ┌───────────┐
+          │ User Device│
+          └─────┬─────┘
+                │
+          encrypted data
+                │
+        ┌───────┴───────┐
+        ▼               ▼
+    Telegram          Discord
+    untrusted         untrusted
+     storage           storage
+```
+
+### Principles
+
+**Local-first encryption**
+
+Plaintext files are processed locally before being uploaded.
+
+**Untrusted providers**
+
+Storage providers are treated as storage infrastructure, not trusted holders of plaintext data.
+
+**No custom cryptography**
+
+Stashify uses established cryptographic implementations.
+
+**Authenticated data**
+
+Encrypted chunks should provide confidentiality and integrity.
+
+**Minimal exposure**
+
+Provider APIs should receive only the information required to store and retrieve encrypted data.
+
+**Open source**
+
+The codebase is intended to remain publicly auditable.
+
+> Stashify is early-stage software. Do not rely on it for critical backups until the security model, implementation, and recovery mechanisms have been thoroughly reviewed.
 
 ---
 
-*Stash: your files, your keys, your choice of storage.*
+# Architecture
+
+At a high level:
+
+```text
+                         ┌───────────────┐
+                         │   Stashify    │
+                         │      TUI      │
+                         └───────┬───────┘
+                                 │
+                         ┌───────▼───────┐
+                         │      CLI      │
+                         └───────┬───────┘
+                                 │
+                         ┌───────▼───────┐
+                         │  Core Engine  │
+                         └───────┬───────┘
+                                 │
+              ┌──────────────────┼──────────────────┐
+              │                  │                  │
+              ▼                  ▼                  ▼
+          Encryption          Chunking           Metadata
+              │                  │                  │
+              └──────────────────┼──────────────────┘
+                                 │
+                         ┌───────▼───────┐
+                         │ Storage Router│
+                         └───────┬───────┘
+                                 │
+                    ┌────────────┼────────────┐
+                    ▼            ▼            ▼
+                Telegram      Discord       Future
+                                             Providers
+```
+
+The architecture intentionally separates:
+
+* User interface
+* Core storage logic
+* Cryptography
+* Chunking
+* Metadata
+* Job execution
+* Provider implementations
+
+This allows the system to evolve without coupling the entire codebase to a specific provider.
+
+---
+
+# Project Status
+
+> **Stashify is currently in early development.**
+
+The architecture is being actively developed and APIs may change significantly.
+
+| Component              | Status      |
+| ---------------------- | ----------- |
+| Project architecture   | In progress |
+| Python CLI             | In progress |
+| TUI                    | In progress |
+| Encryption             | In progress |
+| Chunking               | In progress |
+| Manifest / metadata    | In progress |
+| Provider abstraction   | In progress |
+| Telegram provider      | In progress |
+| Discord provider       | Planned     |
+| Async job engine       | In progress |
+| Resumable transfers    | Planned     |
+| Multi-provider routing | Planned     |
+| Verification           | Planned     |
+| Repair / recovery      | Future      |
+| Additional providers   | Future      |
+
+Features marked **Planned** or **Future** should not be considered implemented.
+
+---
+
+# Development
+
+Stashify is built with Python and is designed around asynchronous I/O.
+
+The project aims to keep the core storage engine independent from its user interfaces and provider implementations.
+
+A typical architecture is:
+
+```text
+UI
+ │
+ ├── TUI
+ └── CLI
+      │
+      ▼
+Core Storage Engine
+      │
+ ├── Crypto
+ ├── Chunking
+ ├── Metadata
+ ├── Jobs
+ └── Storage Router
+      │
+      ├── Telegram
+      ├── Discord
+      └── Future Providers
+```
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for contribution guidelines.
+
+---
+
+# Contributing
+
+Contributions are welcome.
+
+Some areas where contributions will be especially useful:
+
+* Storage providers
+* Encryption and security review
+* Chunking and transfer reliability
+* TUI/UX improvements
+* Testing
+* Documentation
+* Performance
+* Cross-platform support
+
+Please read [CONTRIBUTING.md](CONTRIBUTING.md) before opening a pull request.
+
+If you discover a potential security vulnerability, please follow the project's security reporting process rather than publicly disclosing the issue immediately.
+
+---
+
+# Roadmap
+
+The long-term goal is to turn Stashify into a flexible encrypted storage layer that can sit on top of almost any suitable storage provider.
+
+### Near term
+
+* [ ] Core encryption pipeline
+* [ ] Chunking
+* [ ] SQLite metadata
+* [ ] Telegram provider
+* [ ] Interactive TUI
+* [ ] Async transfer system
+* [ ] Resumable uploads
+
+### Medium term
+
+* [ ] Discord provider
+* [ ] Multi-provider routing
+* [ ] Replication
+* [ ] Integrity verification
+* [ ] Recovery/repair
+* [ ] Provider health monitoring
+
+### Long term
+
+* [ ] S3-compatible providers
+* [ ] Backblaze B2
+* [ ] Google Drive
+* [ ] WebDAV
+* [ ] Local filesystem backend
+* [ ] Additional community providers
+* [ ] Advanced redundancy strategies
+
+The roadmap is intentionally flexible and will evolve as the project matures.
+
+---
+
+# License
+
+Stashify is released under the **MIT License**.
+
+See [LICENSE](LICENSE) for the full license text.
+
+---
+
+<p align="center">
+  <strong>Stashify</strong><br>
+  <sub>Your files. Your keys. Your storage.</sub>
+</p>
