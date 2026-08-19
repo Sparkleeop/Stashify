@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from textual import on
+from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical
 from textual.screen import Screen
 from textual.widgets import Button, Input, Label, Select, Static
@@ -14,40 +15,23 @@ if TYPE_CHECKING:
     from stash.providers import ProviderRegistry
 
 
-class ProvidersScreen(Screen):
-    """Provider management screen."""
+class ProviderCard(Static):
+    """A provider card widget."""
 
     DEFAULT_CSS = """
-    ProvidersScreen {
-        background: #292831;
-        padding: 2;
-    }
-
-    .screen-title {
-        color: #fbbbad;
-        text-style: bold;
-        margin-bottom: 2;
-        border-bottom: solid #4a7a96;
-        padding-bottom: 1;
-    }
-
-    .provider-list {
-        width: 100%;
-        margin-bottom: 2;
-    }
-
-    .provider-card {
+    ProviderCard {
         background: #333f58;
         border: solid #4a7a96;
         margin: 1 0;
         padding: 1;
+        height: auto;
     }
 
-    .provider-card.connected {
+    ProviderCard.connected {
         border: solid #4a7a96;
     }
 
-    .provider-card.disconnected {
+    ProviderCard.disconnected {
         border: solid #ee8695;
     }
 
@@ -106,15 +90,53 @@ class ProvidersScreen(Screen):
         background: #333f58;
         border: solid #ee8695;
     }
+    """
 
-    .provider-button.primary {
-        background: #ee8695;
-        color: #292831;
-        border: solid #ee8695;
+    def __init__(self, name: str, config, connected: bool = True) -> None:
+        super().__init__(classes=f"provider-card {'connected' if connected else 'disconnected'}")
+        self.name = name
+        self.config = config
+        self.connected = connected
+        self.border_title = name
+
+    def compose(self) -> ComposeResult:
+        with Horizontal(classes="provider-header"):
+            yield Static(self.name, classes="provider-name")
+            yield Static(
+                "● Connected" if self.connected else "○ Disconnected",
+                classes=f"provider-status {'connected' if self.connected else 'disconnected'}"
+            )
+            yield Static(self.config.type.upper(), classes="provider-type")
+
+        yield Static(f"Channel: {self.config.credentials.get('channel_id', 'unknown')}", classes="provider-details")
+        yield Static(f"Type: {self.config.type} | Max concurrent: {self.config.settings.get('max_concurrent', '3')}", classes="provider-details")
+
+        with Horizontal(classes="provider-actions"):
+            yield Button("Test", variant="default", id=f"test-{self.name}")
+            yield Button("Reconfigure", variant="default", id=f"reconfig-{self.name}")
+            yield Button("Remove", variant="error", id=f"remove-{self.name}")
+
+
+class ProvidersScreen(Screen[None]):
+    """Provider management screen."""
+
+    DEFAULT_CSS = """
+    ProvidersScreen {
+        background: #292831;
+        padding: 2;
     }
 
-    .provider-button.primary:hover {
-        background: #fbbbad;
+    .screen-title {
+        color: #fbbbad;
+        text-style: bold;
+        margin-bottom: 2;
+        border-bottom: solid #4a7a96;
+        padding-bottom: 1;
+    }
+
+    .provider-list {
+        width: 100%;
+        margin-bottom: 2;
     }
 
     .add-provider-form {
@@ -211,7 +233,7 @@ class ProvidersScreen(Screen):
 
         # Remove existing provider cards
         for child in list(self.children):
-            if hasattr(child, 'classes') and 'provider-card' in (child.classes if child.classes else ''):
+            if isinstance(child, ProviderCard):
                 child.remove()
 
         for name in providers:
@@ -220,33 +242,7 @@ class ProvidersScreen(Screen):
                 continue
 
             connected = True  # Could check actual connection
-            
-            # Create the provider card with all children
-            card = Static(classes=f"provider-card {'connected' if connected else 'disconnected'}")
-            card.border_title = name
-            
-            # Build card content
-            header = Static("", classes="provider-header")
-            header.compose = lambda: [
-                Static(name, classes="provider-name"),
-                Static("● Connected" if connected else "○ Disconnected",
-                       classes=f"provider-status {'connected' if connected else 'disconnected'}"),
-                Static(config.type.upper(), classes="provider-type"),
-            ]
-            
-            details1 = Static(f"Channel: {config.credentials.get('channel_id', 'unknown')}",
-                           classes="provider-details")
-            details2 = Static(f"Type: {config.type} | Max concurrent: {config.settings.get('max_concurrent', '3')}",
-                           classes="provider-details")
-            
-            actions = Static("", classes="provider-actions")
-            actions.compose = lambda: [
-                Button("Test", variant="default", id=f"test-{name}"),
-                Button("Reconfigure", variant="default", id=f"reconfig-{name}"),
-                Button("Remove", variant="error", id=f"remove-{name}"),
-            ]
-            
-            card.mount(header, details1, details2, actions)
+            card = ProviderCard(name, config, connected)
             self.mount(card, before="#no-providers")
 
     @on(Button.Pressed, "#add-provider-btn")

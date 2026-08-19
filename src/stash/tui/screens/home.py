@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 from textual import on
+from textual.app import ComposeResult
 from textual.containers import Center, Middle, Vertical
 from textual.screen import Screen
 from textual.widgets import Button, Static
 
 
-class HomeScreen(Screen):
+class HomeScreen(Screen[None]):
     """Initial home/welcome screen."""
 
     DEFAULT_CSS = """
@@ -157,7 +158,8 @@ class HomeScreen(Screen):
     def on_help(self, event: Button.Pressed) -> None:
         """Open help overlay."""
         try:
-            help_overlay = self.app.query_one("#help-overlay")
+            app = self.app
+            help_overlay = app.query_one("#help-overlay")
             help_overlay.show()
         except Exception:
             pass
