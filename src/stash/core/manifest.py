@@ -65,6 +65,7 @@ class FileManifest:
         data["chunks"] = [asdict(c) for c in self.chunks]
         data["encryption"] = asdict(self.encryption)
         data["strategy"] = self.strategy.value
+        data["encrypted_name_nonce"] = self.encrypted_name_nonce.hex()
         for chunk in data["chunks"]:
             chunk["nonce"] = chunk["nonce"].hex()
         data["encryption"]["file_key_salt"] = data["encryption"]["file_key_salt"].hex()
@@ -77,10 +78,12 @@ class FileManifest:
         """Deserialize manifest from JSON."""
         data = json.loads(json_str)
         data["strategy"] = DistributionStrategy(data["strategy"])
-        data["encryption"] = EncryptionInfo(**data["encryption"])
-        data["encryption"]["file_key_salt"] = bytes.fromhex(data["encryption"]["file_key_salt"])
-        if data["encryption"]["file_key_wrapped"]:
-            data["encryption"]["file_key_wrapped"] = bytes.fromhex(data["encryption"]["file_key_wrapped"])
+        enc_data = data["encryption"]
+        enc_data["file_key_salt"] = bytes.fromhex(enc_data["file_key_salt"])
+        if enc_data["file_key_wrapped"]:
+            enc_data["file_key_wrapped"] = bytes.fromhex(enc_data["file_key_wrapped"])
+        data["encryption"] = EncryptionInfo(**enc_data)
+        data["encrypted_name_nonce"] = bytes.fromhex(data["encrypted_name_nonce"])
         chunks = []
         for c in data["chunks"]:
             c["nonce"] = bytes.fromhex(c["nonce"])

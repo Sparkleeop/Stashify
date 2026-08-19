@@ -98,12 +98,14 @@ class CryptoEngine:
         ciphertext = aesgcm.encrypt(nonce, file_key.key, None)
         return salt + nonce + ciphertext
 
-    def decrypt_file_key(self, wrapped: bytes, password: str, salt: bytes, config: EncryptionConfig) -> FileKey:
+    def decrypt_file_key(self, wrapped: bytes, password: str, config: EncryptionConfig) -> FileKey:
         """Decrypt a file key with a password."""
-        if len(wrapped) < config.nonce_size + TAG_SIZE:
+        # wrapped format: salt (16) + nonce (12) + ciphertext
+        if len(wrapped) < SALT_SIZE + config.nonce_size + TAG_SIZE:
             raise CryptoError("Invalid wrapped key format")
-        nonce = wrapped[:config.nonce_size]
-        ciphertext = wrapped[config.nonce_size:]
+        salt = wrapped[:SALT_SIZE]
+        nonce = wrapped[SALT_SIZE:SALT_SIZE + config.nonce_size]
+        ciphertext = wrapped[SALT_SIZE + config.nonce_size:]
         hkdf = HKDF(
             algorithm=hashes.SHA256(),
             length=config.key_size,

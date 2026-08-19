@@ -59,6 +59,7 @@ test_encrypted/
 test_roundtrip/
 *.stsh*
 *.manifest.json
+*config.json
 
 # Logs
 *.log

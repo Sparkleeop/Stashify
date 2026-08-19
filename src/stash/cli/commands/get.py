@@ -55,7 +55,6 @@ async def _get_async(
                 key=crypto.decrypt_file_key(
                     manifest.encryption.file_key_wrapped,
                     password,
-                    manifest.encryption.file_key_salt,
                     enc_config
                 ).key,
                 salt=manifest.encryption.file_key_salt,
