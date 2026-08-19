@@ -115,8 +115,8 @@ def format_timestamp(ts: float) -> str:
 
 def confirm(message: str, default: bool = False) -> bool:
     """Ask for confirmation."""
-    suffix = " [Y/n]" if default else " [y/N]"
-    response = console.input(f"{message}{suffix}: ").strip().lower()
+    suffix = " (y/n)"
+    response = console.input(f"{message} (y/n): ").strip().lower()
     if not response:
         return default
     return response in ("y", "yes")
