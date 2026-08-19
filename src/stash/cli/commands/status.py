@@ -9,10 +9,10 @@ from stash.core.metadata import MetadataStore
 
 
 @click.command()
-@click.option("--path", "-p", default=".", help="Repository path")
-def status_cmd(path: str) -> None:
+@click.pass_context
+def status_cmd(ctx: click.Context) -> None:
     """Show overall repository status."""
-    repo = Path(path).resolve()
+    repo = ctx.obj["repo"].resolve()
     store = MetadataStore(repo)
 
     config = store.load_config()

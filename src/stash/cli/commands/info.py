@@ -10,10 +10,10 @@ from stash.core.metadata import MetadataStore
 
 @click.command()
 @click.argument("file_id_or_name")
-@click.option("--path", "-p", default=".", help="Repository path")
-def info_cmd(file_id_or_name: str, path: str) -> None:
+@click.pass_context
+def info_cmd(ctx: click.Context, file_id_or_name: str) -> None:
     """Show detailed file metadata."""
-    repo = Path(path).resolve()
+    repo = ctx.obj["repo"].resolve()
     store = MetadataStore(repo)
 
     file_id = _resolve_file_id(store, file_id_or_name)

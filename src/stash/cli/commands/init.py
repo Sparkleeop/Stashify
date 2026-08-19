@@ -9,11 +9,11 @@ from stash.core.metadata import MetadataStore
 
 
 @click.command()
-@click.option("--path", "-p", default=".", help="Repository path")
 @click.option("--force", "-f", is_flag=True, help="Overwrite existing repository")
-def init_cmd(path: str, force: bool) -> None:
+@click.pass_context
+def init_cmd(ctx: click.Context, force: bool) -> None:
     """Initialize a new Stash repository."""
-    repo_path = Path(path).resolve()
+    repo_path = ctx.obj["repo"]
     metadata_dir = repo_path / ".stash" / "metadata"
 
     if metadata_dir.exists() and not force:

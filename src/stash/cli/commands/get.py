@@ -13,23 +13,23 @@ from stash.providers import ProviderRegistry
 
 @click.command()
 @click.argument("file_id_or_name")
-@click.option("--path", "-p", default=".", help="Repository path")
 @click.option("--output", "-o", type=click.Path(path_type=Path), help="Output path (default: current directory)")
 @click.option("--password", prompt=True, hide_input=True, help="Encryption password")
 @click.option("--overwrite", is_flag=True, help="Overwrite existing file")
-def get_cmd(file_id_or_name: str, path: str, output: Path | None, password: str, overwrite: bool) -> None:
+@click.pass_context
+def get_cmd(ctx: click.Context, file_id_or_name: str, output: Path | None, password: str, overwrite: bool) -> None:
     """Retrieve a file from Stash."""
-    asyncio.run(_get_async(file_id_or_name, path, output, password, overwrite))
+    asyncio.run(_get_async(file_id_or_name, ctx.obj["repo"], output, password, overwrite))
 
 
 async def _get_async(
     file_id_or_name: str,
-    repo_path: str,
+    repo_path: Path,
     output: Path | None,
     password: str,
     overwrite: bool,
 ) -> None:
-    repo = Path(repo_path).resolve()
+    repo = repo_path.resolve()
     store = MetadataStore(repo)
 
     file_id = _resolve_file_id(store, file_id_or_name)

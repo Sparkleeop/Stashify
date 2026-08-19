@@ -23,27 +23,27 @@ from stash.providers import ProviderRegistry
 
 @click.command()
 @click.argument("file_path", type=click.Path(exists=True, path_type=Path))
-@click.option("--path", "-p", default=".", help="Repository path")
 @click.option("--provider", help="Specific provider to use (default: first available)")
 @click.option("--chunk-size", type=int, help="Chunk size in bytes (default: provider limit)")
 @click.option("--strategy", type=click.Choice(["single", "split", "balanced", "replicated"]), default="single", help="Distribution strategy")
 @click.option("--password", prompt=True, hide_input=True, help="Encryption password")
 @click.option("--confirm/--no-confirm", default=True, help="Confirm before upload")
-def put_cmd(file_path: Path, path: str, provider: str | None, chunk_size: int | None, strategy: str, password: str, confirm: bool) -> None:
+@click.pass_context
+def put_cmd(ctx: click.Context, file_path: Path, provider: str | None, chunk_size: int | None, strategy: str, password: str, confirm: bool) -> None:
     """Store a file in Stash."""
-    asyncio.run(_put_async(file_path, path, provider, chunk_size, strategy, password, confirm))
+    asyncio.run(_put_async(file_path, ctx.obj["repo"], provider, chunk_size, strategy, password, confirm))
 
 
 async def _put_async(
     file_path: Path,
-    repo_path: str,
+    repo_path: Path,
     provider_name: str | None,
     chunk_size: int | None,
     strategy: str,
     password: str,
     do_confirm: bool,
 ) -> None:
-    repo = Path(repo_path).resolve()
+    repo = repo_path.resolve()
     store = MetadataStore(repo)
 
     providers = store.list_providers()

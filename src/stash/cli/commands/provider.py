@@ -12,14 +12,14 @@ from stash.providers import ProviderRegistry
 
 @click.command()
 @click.argument("name")
-@click.option("--path", "-p", default=".", help="Repository path")
 @click.option("--token", prompt=True, hide_input=True, help="Discord bot/user token")
 @click.option("--channel-id", prompt=True, help="Discord channel ID for storage")
 @click.option("--is-bot/--is-user", default=True, help="Token type (default: bot)")
 @click.option("--max-concurrent", default=3, help="Max concurrent uploads")
-def provider_add_cmd(name: str, path: str, token: str, channel_id: str, is_bot: bool, max_concurrent: int) -> None:
+@click.pass_context
+def provider_add_cmd(ctx: click.Context, name: str, token: str, channel_id: str, is_bot: bool, max_concurrent: int) -> None:
     """Add a storage provider."""
-    repo_path = Path(path).resolve()
+    repo_path = ctx.obj["repo"]
     store = MetadataStore(repo_path)
 
     if name in store.list_providers():
@@ -49,10 +49,10 @@ def provider_add_cmd(name: str, path: str, token: str, channel_id: str, is_bot: 
 
 
 @click.command(name="list")
-@click.option("--path", "-p", default=".", help="Repository path")
-def provider_list_cmd(path: str) -> None:
+@click.pass_context
+def provider_list_cmd(ctx: click.Context) -> None:
     """List configured providers."""
-    repo_path = Path(path).resolve()
+    repo_path = ctx.obj["repo"]
     store = MetadataStore(repo_path)
 
     providers = store.list_providers()
@@ -73,11 +73,11 @@ def provider_list_cmd(path: str) -> None:
 
 @click.command()
 @click.argument("name")
-@click.option("--path", "-p", default=".", help="Repository path")
 @click.option("--force", "-f", is_flag=True, help="Force removal")
-def provider_remove_cmd(name: str, path: str, force: bool) -> None:
+@click.pass_context
+def provider_remove_cmd(ctx: click.Context, name: str, force: bool) -> None:
     """Remove a storage provider."""
-    repo_path = Path(path).resolve()
+    repo_path = ctx.obj["repo"]
     store = MetadataStore(repo_path)
 
     if name not in store.list_providers():

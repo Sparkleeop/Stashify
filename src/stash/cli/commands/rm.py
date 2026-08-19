@@ -12,16 +12,16 @@ from stash.providers import ProviderRegistry
 
 @click.command()
 @click.argument("file_id_or_name")
-@click.option("--path", "-p", default=".", help="Repository path")
 @click.option("--force", "-f", is_flag=True, help="Force removal without confirmation")
 @click.option("--remote/--local-only", default=True, help="Also delete from remote providers")
-def rm_cmd(file_id_or_name: str, path: str, force: bool, remote: bool) -> None:
+@click.pass_context
+def rm_cmd(ctx: click.Context, file_id_or_name: str, force: bool, remote: bool) -> None:
     """Remove a stored file."""
-    asyncio.run(_rm_async(file_id_or_name, path, force, remote))
+    asyncio.run(_rm_async(file_id_or_name, ctx.obj["repo"], force, remote))
 
 
-async def _rm_async(file_id_or_name: str, repo_path: str, force: bool, remote: bool) -> None:
-    repo = Path(repo_path).resolve()
+async def _rm_async(file_id_or_name: str, repo_path: Path, force: bool, remote: bool) -> None:
+    repo = repo_path.resolve()
     store = MetadataStore(repo)
 
     file_id = _resolve_file_id(store, file_id_or_name)

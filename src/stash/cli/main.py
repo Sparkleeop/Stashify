@@ -1,6 +1,7 @@
 """Stash CLI main entry point."""
 
 import click
+from pathlib import Path
 
 from stash import __version__
 from stash.cli.commands.get import get_commands
@@ -16,12 +17,14 @@ from stash.cli.commands.verify import verify_commands
 
 @click.group()
 @click.version_option(version=__version__)
+@click.option("--repo", "-r", type=click.Path(path_type=Path), help="Repository path")
 @click.option("--verbose", "-v", is_flag=True, help="Verbose output")
 @click.pass_context
-def main(ctx: click.Context, verbose: bool) -> None:
+def main(ctx: click.Context, repo: Path | None, verbose: bool) -> None:
     """Stash - Privacy-focused CLI storage using third-party platforms."""
     ctx.ensure_object(dict)
     ctx.obj["verbose"] = verbose
+    ctx.obj["repo"] = repo.resolve() if repo else Path.cwd()
 
 
 main.add_command(init_commands)

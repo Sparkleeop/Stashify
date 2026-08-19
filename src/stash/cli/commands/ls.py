@@ -9,11 +9,11 @@ from stash.core.metadata import MetadataStore
 
 
 @click.command()
-@click.option("--path", "-p", default=".", help="Repository path")
 @click.option("--long", "-l", is_flag=True, help="Show detailed information")
-def ls_cmd(path: str, long: bool) -> None:
+@click.pass_context
+def ls_cmd(ctx: click.Context, long: bool) -> None:
     """List stored files."""
-    repo = Path(path).resolve()
+    repo = ctx.obj["repo"].resolve()
     store = MetadataStore(repo)
 
     files = store.list_files()
