@@ -14,7 +14,7 @@ from stash.cli.commands.status import status_commands
 from stash.cli.commands.verify import verify_commands
 
 
-@click.group(invoke_without_command=True)
+@click.group()
 @click.version_option(version=__version__)
 @click.option("--verbose", "-v", is_flag=True, help="Verbose output")
 @click.pass_context
@@ -22,17 +22,6 @@ def main(ctx: click.Context, verbose: bool) -> None:
     """Stash - Privacy-focused CLI storage using third-party platforms."""
     ctx.ensure_object(dict)
     ctx.obj["verbose"] = verbose
-    if ctx.invoked_subcommand is None:
-        # Launch TUI when no command provided
-        from stash.tui import run_tui
-        run_tui()
-
-
-@main.command()
-def tui() -> None:
-    """Launch the interactive terminal UI."""
-    from stash.tui import run_tui
-    run_tui()
 
 
 main.add_command(init_commands)
@@ -44,7 +33,6 @@ main.add_command(info_commands)
 main.add_command(rm_commands)
 main.add_command(verify_commands)
 main.add_command(status_commands)
-main.add_command(tui)
 
 
 if __name__ == "__main__":
