@@ -149,7 +149,7 @@ async def _put_async(
                 checksum=checksum,
                 provider=provider_name,
                 remote_id=remote_ref.remote_id,
-                nonce=b"",
+                nonce=encrypted.nonce,
                 metadata=remote_ref.metadata,
             )
             progress.advance(task)
