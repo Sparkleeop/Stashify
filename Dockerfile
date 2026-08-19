@@ -13,7 +13,7 @@ COPY pyproject.toml README.md ./
 COPY src/ ./src/
 
 # Build the package
-RUN pip install --no-cache-dir build && \
+RUN pip install --no-cache-dir build setuptools wheel && \
     python -m build --wheel --no-isolation
 
 # Runtime stage
