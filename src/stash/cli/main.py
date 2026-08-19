@@ -16,7 +16,7 @@ from stash.cli.commands.status import status_commands
 from stash.cli.commands.verify import verify_commands
 
 
-@click.group()
+@click.group(invoke_without_command=True)
 @click.version_option(version=__version__)
 @click.option("--repo", "-r", type=click.Path(path_type=Path), help="Repository path")
 @click.option("--verbose", "-v", is_flag=True, help="Verbose output")

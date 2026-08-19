@@ -56,6 +56,12 @@ ignore = [
 fixable = ["ALL"]
 unfixable = ["T20", "ARG001", "ARG002"]
 
+[tool.setuptools]
+packages = {where = ["src"], include = ["stash*"]}
+entry-points = [
+    "console_scripts = stash = stash.cli:main"
+]
+
 [tool.ruff.format]
 quote-style = "double"
 indent-style = "space"
