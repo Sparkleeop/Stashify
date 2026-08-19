@@ -104,36 +104,6 @@ async def _get_async(
         instance = await ProviderRegistry.create(config.type, config)
         provider_instances[name] = instance
 
-    crypto = CryptoEngine()
-    file_key = None
-
-    try:
-        if manifest.encryption.file_key_wrapped:
-            from stash.core.crypto import FileKey
-            # Convert EncryptionInfo to EncryptionConfig for decrypt_file_key
-            enc_config = EncryptionConfig(
-                algorithm=manifest.encryption.algorithm,
-                key_size=manifest.encryption.key_size,
-                nonce_size=manifest.encryption.nonce_size,
-                chunk_key_derivation=manifest.encryption.chunk_key_derivation,
-            )
-            file_key = FileKey(
-                key=crypto.decrypt_file_key(
-                    manifest.encryption.file_key_wrapped,
-                    password,
-                    manifest.encryption.file_key_salt,
-                    enc_config
-                ).key,
-                salt=manifest.encryption.file_key_salt,
-                config=enc_config
-            )
-        else:
-            print_error("File key not wrapped - cannot decrypt")
-            return
-    except Exception as e:
-        print_error(f"Failed to decrypt file key: {e}")
-        return
-
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
     progress = create_progress()
