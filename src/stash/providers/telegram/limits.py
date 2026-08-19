@@ -1,9 +1,7 @@
 """Telegram provider limits and constraints."""
 
-from dataclasses import dataclass
 
 from stash.core.storage import ProviderLimits
-
 
 MAX_FILE_SIZE: int = 20 * 1024 * 1024  # 20MB for regular bots
 DEFAULT_CHUNK_SIZE: int = 10 * 1024 * 1024  # 10MB

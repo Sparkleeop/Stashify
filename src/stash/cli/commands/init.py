@@ -1,6 +1,5 @@
 """CLI command: init - Initialize a new Stash repository."""
 
-from pathlib import Path
 
 import click
 

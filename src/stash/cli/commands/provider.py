@@ -1,6 +1,5 @@
 """CLI commands for provider management."""
 
-from pathlib import Path
 
 import click
 
@@ -110,10 +109,9 @@ def provider_remove_cmd(ctx: click.Context, name: str, force: bool) -> None:
         print_error(f"Provider '{name}' not found")
         return
 
-    if not force:
-        if not confirm(f"Remove provider '{name}'?"):
-            print_info("Cancelled")
-            return
+    if not force and not confirm(f"Remove provider '{name}'?"):
+        print_info("Cancelled")
+        return
 
     store.remove_provider_config(name)
     print_success(f"Removed provider '{name}'")

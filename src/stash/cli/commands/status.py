@@ -1,6 +1,5 @@
 """CLI command: status - Show overall repository status."""
 
-from pathlib import Path
 
 import click
 

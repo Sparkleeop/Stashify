@@ -1,7 +1,8 @@
 """Stash CLI main entry point."""
 
-import click
 from pathlib import Path
+
+import click
 
 from stash import __version__
 from stash.cli.commands.get import get_commands

@@ -78,7 +78,6 @@ async def _put_async(
     wrapped_key = crypto.encrypt_file_key(file_key, password)
 
     # Encrypt the filename
-    from stash.core.crypto import EncryptedChunk
     encrypted_name_chunk = crypto.encrypt_chunk(file_path.name.encode(), file_key, -1)
     encrypted_name = encrypted_name_chunk.ciphertext.hex()
     encrypted_name_nonce = encrypted_name_chunk.nonce
@@ -127,7 +126,7 @@ async def _put_async(
 
     print_info(f"Processing {num_chunks} chunks ({format_size(effective_chunk_size)} each)...")
 
-    job_config = JobConfig(max_workers=min(4, num_chunks))
+    JobConfig(max_workers=min(4, num_chunks))
 
     semaphores = {name: asyncio.Semaphore(int(p.config.settings.get("max_concurrent", "3"))) for name, p in provider_instances.items()}
 

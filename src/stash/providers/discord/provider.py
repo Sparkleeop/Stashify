@@ -6,6 +6,15 @@ import httpx
 
 from stash.core.chunking import Chunk
 from stash.core.exceptions import ProviderAuthError, ProviderError, ProviderRateLimitError
+from stash.core.http_status import (
+    HTTP_CREATED,
+    HTTP_FORBIDDEN,
+    HTTP_NO_CONTENT,
+    HTTP_NOT_FOUND,
+    HTTP_OK,
+    HTTP_TOO_MANY_REQUESTS,
+    HTTP_UNAUTHORIZED,
+)
 from stash.core.storage import BaseStorageProvider, ProviderConfig, ProviderLimits, RemoteRef
 from stash.providers.discord.auth import DISCORD_API_BASE, DiscordAuth
 from stash.providers.discord.limits import get_discord_limits
@@ -55,13 +64,13 @@ class DiscordProvider(BaseStorageProvider):
             raise ProviderError("Provider not initialized")
 
         response = await self._client.get(f"/channels/{self.channel_id}")
-        if response.status_code == 401:
+        if response.status_code == HTTP_UNAUTHORIZED:
             raise ProviderAuthError("Invalid Discord token")
-        if response.status_code == 403:
+        if response.status_code == HTTP_FORBIDDEN:
             raise ProviderAuthError("No permission to access channel")
-        if response.status_code == 404:
+        if response.status_code == HTTP_NOT_FOUND:
             raise ProviderAuthError("Channel not found")
-        if response.status_code != 200:
+        if response.status_code != HTTP_OK:
             raise ProviderError(f"Failed to validate channel: {response.status_code}")
 
     async def upload_chunk(self, chunk: Chunk, remote_path: str) -> RemoteRef:
@@ -91,12 +100,12 @@ class DiscordProvider(BaseStorageProvider):
         self, response: httpx.Response, chunk_index: int, remote_path: str
     ) -> RemoteRef:
         """Handle upload response and extract message ID."""
-        if response.status_code == 429:
+        if response.status_code == HTTP_TOO_MANY_REQUESTS:
             retry_after = response.json().get("retry_after", 1)
             await asyncio.sleep(retry_after)
             raise ProviderRateLimitError(f"Rate limited, retry after {retry_after}s")
 
-        if response.status_code not in (200, 201):
+        if response.status_code not in (HTTP_OK, HTTP_CREATED):
             raise ProviderError(f"Upload failed: {response.status_code} - {response.text}")
 
         data = response.json()
@@ -131,13 +140,13 @@ class DiscordProvider(BaseStorageProvider):
         async with self._rate_limit_semaphore:
             response = await self._client.get(f"/channels/{self.channel_id}/messages/{message_id}")
 
-            if response.status_code == 404:
+            if response.status_code == HTTP_NOT_FOUND:
                 raise ProviderError("Message not found")
-            if response.status_code == 429:
+            if response.status_code == HTTP_TOO_MANY_REQUESTS:
                 retry_after = response.json().get("retry_after", 1)
                 await asyncio.sleep(retry_after)
                 raise ProviderRateLimitError(f"Rate limited, retry after {retry_after}s")
-            if response.status_code != 200:
+            if response.status_code != HTTP_OK:
                 raise ProviderError(f"Download failed: {response.status_code}")
 
             data = response.json()
@@ -149,7 +158,7 @@ class DiscordProvider(BaseStorageProvider):
             url = attachment["url"]
 
             file_response = await self._client.get(url)
-            if file_response.status_code != 200:
+            if file_response.status_code != HTTP_OK:
                 raise ProviderError(f"File download failed: {file_response.status_code}")
 
             return file_response.content
@@ -168,7 +177,7 @@ class DiscordProvider(BaseStorageProvider):
 
         async with self._rate_limit_semaphore:
             response = await self._client.delete(f"/channels/{self.channel_id}/messages/{message_id}")
-            if response.status_code not in (200, 204, 404):
+            if response.status_code not in (HTTP_OK, HTTP_NO_CONTENT, HTTP_NOT_FOUND):
                 raise ProviderError(f"Delete failed: {response.status_code}")
 
     async def list_chunks(self, prefix: str) -> list[RemoteRef]:
@@ -194,11 +203,11 @@ class DiscordProvider(BaseStorageProvider):
             async with self._rate_limit_semaphore:
                 response = await self._client.get(f"/channels/{self.channel_id}/messages", params=params)
 
-            if response.status_code == 429:
+            if response.status_code == HTTP_TOO_MANY_REQUESTS:
                 retry_after = response.json().get("retry_after", 1)
                 await asyncio.sleep(retry_after)
                 continue
-            if response.status_code != 200:
+            if response.status_code != HTTP_OK:
                 raise ProviderError(f"List failed: {response.status_code}")
 
             messages = response.json()

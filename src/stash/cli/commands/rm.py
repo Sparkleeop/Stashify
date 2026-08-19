@@ -31,10 +31,9 @@ async def _rm_async(file_id_or_name: str, repo_path: Path, force: bool, remote: 
 
     manifest = store.load_manifest(file_id)
 
-    if not force:
-        if not confirm(f"Remove '{manifest.original_name}' ({file_id[:16]})?"):
-            print_info("Cancelled")
-            return
+    if not force and not confirm(f"Remove '{manifest.original_name}' ({file_id[:16]})?"):
+        print_info("Cancelled")
+        return
 
     if remote:
         providers_config = {}

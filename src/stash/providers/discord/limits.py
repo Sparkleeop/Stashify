@@ -1,6 +1,6 @@
 """Discord provider limits and constraints."""
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 from stash.core.storage import ProviderLimits
 
