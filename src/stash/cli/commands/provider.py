@@ -12,12 +12,23 @@ from stash.providers import ProviderRegistry
 
 @click.command()
 @click.argument("name")
-@click.option("--token", prompt=True, hide_input=True, help="Discord bot/user token")
-@click.option("--channel-id", prompt=True, help="Discord channel ID for storage")
-@click.option("--is-bot/--is-user", default=True, help="Token type (default: bot)")
+@click.option("--type", "provider_type", type=click.Choice(["discord", "telegram"]), help="Provider type")
+@click.option("--token", prompt=True, hide_input=True, help="Bot token")
+@click.option("--channel-id", help="Discord channel ID for storage")
+@click.option("--chat-id", help="Telegram chat ID for storage")
+@click.option("--is-bot/--is-user", default=True, help="Discord: token type (default: bot)")
 @click.option("--max-concurrent", default=3, help="Max concurrent uploads")
 @click.pass_context
-def provider_add_cmd(ctx: click.Context, name: str, token: str, channel_id: str, is_bot: bool, max_concurrent: int) -> None:
+def provider_add_cmd(
+    ctx: click.Context,
+    name: str,
+    provider_type: str | None,
+    token: str,
+    channel_id: str | None,
+    chat_id: str | None,
+    is_bot: bool,
+    max_concurrent: int,
+) -> None:
     """Add a storage provider."""
     repo_path = ctx.obj["repo"]
     store = MetadataStore(repo_path)
@@ -26,26 +37,36 @@ def provider_add_cmd(ctx: click.Context, name: str, token: str, channel_id: str,
         print_error(f"Provider '{name}' already exists")
         return
 
-    if name.lower() not in ProviderRegistry.list_providers():
-        print_error(f"Unknown provider type: {name}")
+    if provider_type is None:
+        provider_type = name.lower()
+
+    if provider_type not in ProviderRegistry.list_providers():
+        print_error(f"Unknown provider type: {provider_type}")
         print_info(f"Available types: {', '.join(ProviderRegistry.list_providers())}")
         return
 
+    credentials: dict[str, str] = {"token": token}
+    if provider_type == "discord":
+        if not channel_id:
+            channel_id = click.prompt("Discord channel ID", type=str)
+        credentials["channel_id"] = channel_id
+        credentials["is_bot"] = str(is_bot).lower()
+    elif provider_type == "telegram":
+        if not chat_id:
+            chat_id = click.prompt("Telegram chat ID", type=str)
+        credentials["chat_id"] = chat_id
+
     config = ProviderConfig(
         name=name,
-        type=name.lower(),
-        credentials={
-            "token": token,
-            "channel_id": channel_id,
-            "is_bot": str(is_bot).lower(),
-        },
+        type=provider_type,
+        credentials=credentials,
         settings={
             "max_concurrent": str(max_concurrent),
         },
     )
 
     store.set_provider_config(name, config)
-    print_success(f"Added provider '{name}' ({name.lower()})")
+    print_success(f"Added provider '{name}' ({provider_type})")
 
 
 @click.command(name="list")
@@ -58,7 +79,7 @@ def provider_list_cmd(ctx: click.Context) -> None:
     providers = store.list_providers()
     if not providers:
         print_info("No providers configured")
-        print_info("Add one with: stash provider add discord")
+        print_info("Add one with: stash provider add --type discord <name>")
         return
 
     from stash.cli.output import print_table
@@ -66,9 +87,14 @@ def provider_list_cmd(ctx: click.Context) -> None:
     for name in providers:
         config = store.get_provider_config(name)
         ptype = config.type if config else "unknown"
-        channel = config.credentials.get("channel_id", "unknown") if config else "unknown"
+        if ptype == "discord":
+            channel = config.credentials.get("channel_id", "unknown") if config else "unknown"
+        elif ptype == "telegram":
+            channel = config.credentials.get("chat_id", "unknown") if config else "unknown"
+        else:
+            channel = "unknown"
         rows.append([name, ptype, channel])
-    print_table("Configured Providers", ["Name", "Type", "Channel ID"], rows)
+    print_table("Configured Providers", ["Name", "Type", "Channel/Chat ID"], rows)
 
 
 @click.command()
