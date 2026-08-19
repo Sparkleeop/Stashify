@@ -68,10 +68,9 @@ async def _put_async(
         print_error("Cannot store empty file")
         return
 
-    if do_confirm:
-        if not confirm_prompt(f"Store '{file_path.name}' ({format_size(file_size)})?"):
-            print_info("Cancelled")
-            return
+    if do_confirm and not confirm_prompt(f"Store '{file_path.name}' ({format_size(file_size)})?"):
+        print_info("Cancelled")
+        return
 
     crypto = CryptoEngine()
     file_key = crypto.generate_file_key()

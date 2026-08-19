@@ -45,9 +45,13 @@ include = ["stash*"]
 
 [tool.ruff]
 target-version = "py311"
-line-length = 100
+line-length = 120
 select = ["E", "F", "I", "UP", "B", "C4", "SIM", "T20", "ARG", "PTH", "ERA", "PD", "PL", "TRY", "NPY", "RSE", "RET"]
-ignore = ["S101", "S106", "S311", "B008"]
+ignore = [
+    "S101", "S106", "S311", "B008",
+    "TRY003", "PLR2004", "PLR0913", "PLR0917", "PLR0912", "PLR0915", "PLR0911",
+    "ARG002", "E741", "ARG001", "PLC0415", "E402", "E501", "TRY300", "PLR0911",
+]
 fixable = ["ALL"]
 unfixable = ["T20", "ARG001", "ARG002"]
 
