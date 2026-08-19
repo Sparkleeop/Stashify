@@ -163,8 +163,7 @@ class ProvidersScreen(Screen):
 
     def compose(self) -> ComposeResult:
         yield Static("PROVIDERS", classes="screen-title")
-        with Vertical(classes="provider-list"):
-            yield Static("No providers configured. Add one below.", id="no-providers")
+        yield Static("No providers configured. Add one below.", id="no-providers", classes="provider-list")
         with Vertical(classes="add-provider-form"):
             yield Static("Add Provider", classes="help-section-title")
             with Horizontal(classes="form-row"):
@@ -195,7 +194,6 @@ class ProvidersScreen(Screen):
     def _refresh_providers(self) -> None:
         """Refresh provider list."""
         try:
-            providers_container = self.query_one(".provider-list")
             no_providers = self.query_one("#no-providers", Static)
         except Exception:
             return
@@ -211,9 +209,9 @@ class ProvidersScreen(Screen):
 
         no_providers.display = False
 
-        # Clear existing provider cards
-        for child in list(providers_container.children):
-            if hasattr(child, 'classes') and 'provider-card' in child.classes:
+        # Remove existing provider cards
+        for child in list(self.children):
+            if hasattr(child, 'classes') and 'provider-card' in (child.classes if child.classes else ''):
                 child.remove()
 
         for name in providers:
@@ -222,25 +220,34 @@ class ProvidersScreen(Screen):
                 continue
 
             connected = True  # Could check actual connection
+            
+            # Create the provider card with all children
             card = Static(classes=f"provider-card {'connected' if connected else 'disconnected'}")
-            with card:
-                with Horizontal(classes="provider-header"):
-                    yield Static(name, classes="provider-name")
-                    yield Static("● Connected" if connected else "○ Disconnected",
-                               classes=f"provider-status {'connected' if connected else 'disconnected'}")
-                    yield Static(config.type.upper(), classes="provider-type")
-
-                yield Static(f"Channel: {config.credentials.get('channel_id', 'unknown')}",
+            card.border_title = name
+            
+            # Build card content
+            header = Static("", classes="provider-header")
+            header.compose = lambda: [
+                Static(name, classes="provider-name"),
+                Static("● Connected" if connected else "○ Disconnected",
+                       classes=f"provider-status {'connected' if connected else 'disconnected'}"),
+                Static(config.type.upper(), classes="provider-type"),
+            ]
+            
+            details1 = Static(f"Channel: {config.credentials.get('channel_id', 'unknown')}",
                            classes="provider-details")
-                yield Static(f"Type: {config.type} | Max concurrent: {config.settings.get('max_concurrent', '3')}",
+            details2 = Static(f"Type: {config.type} | Max concurrent: {config.settings.get('max_concurrent', '3')}",
                            classes="provider-details")
-
-                with Horizontal(classes="provider-actions"):
-                    yield Button("Test", variant="default", id=f"test-{name}")
-                    yield Button("Reconfigure", variant="default", id=f"reconfig-{name}")
-                    yield Button("Remove", variant="error", id=f"remove-{name}")
-
-            providers_container.mount(card)
+            
+            actions = Static("", classes="provider-actions")
+            actions.compose = lambda: [
+                Button("Test", variant="default", id=f"test-{name}"),
+                Button("Reconfigure", variant="default", id=f"reconfig-{name}"),
+                Button("Remove", variant="error", id=f"remove-{name}"),
+            ]
+            
+            card.mount(header, details1, details2, actions)
+            self.mount(card, before="#no-providers")
 
     @on(Button.Pressed, "#add-provider-btn")
     def on_add_provider(self, event: Button.Pressed) -> None:

@@ -53,23 +53,23 @@ class HomeScreen(Screen):
         height: 4;
     }
 
-    .home-button.primary {
+    .home-button-primary {
         background: #ee8695;
         color: #292831;
         border: solid #ee8695;
     }
 
-    .home-button.primary:hover {
+    .home-button-primary:hover {
         background: #fbbbad;
     }
 
-    .home-button.secondary {
+    .home-button-secondary {
         background: #292831;
         color: #e8e8e8;
         border: solid #4a7a96;
     }
 
-    .home-button.secondary:hover {
+    .home-button-secondary:hover {
         background: #333f58;
         border: solid #ee8695;
     }
@@ -109,10 +109,10 @@ class HomeScreen(Screen):
                     )
 
                     with Vertical(classes="home-buttons"):
-                        yield Button("Launch Dashboard", variant="primary", id="launch-btn", classes="home-button primary")
-                        yield Button("Providers", variant="default", id="providers-btn", classes="home-button secondary")
-                        yield Button("Settings", variant="default", id="settings-btn", classes="home-button secondary")
-                        yield Button("Help", variant="default", id="help-btn", classes="home-button secondary")
+                        yield Button("Launch Dashboard", id="launch-btn", classes="home-button-primary")
+                        yield Button("Providers", id="providers-btn", classes="home-button-secondary")
+                        yield Button("Settings", id="settings-btn", classes="home-button-secondary")
+                        yield Button("Help", id="help-btn", classes="home-button-secondary")
 
                     yield Static("", classes="provider-status", id="provider-status")
                     yield Static("Press ? for keyboard shortcuts", classes="shortcuts-hint")
