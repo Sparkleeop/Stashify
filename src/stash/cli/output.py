@@ -83,7 +83,7 @@ def print_file_info(manifest: FileManifest, providers: dict[str, Any]) -> None:
         rows = []
         for chunk in manifest.chunks:
             provider_name = chunk.provider
-            provider_info = providers.get(provider_name, {})
+            providers.get(provider_name, {})
             rows.append([
                 str(chunk.index),
                 format_size(chunk.size),
@@ -115,8 +115,8 @@ def format_timestamp(ts: float) -> str:
 
 def confirm(message: str, default: bool = False) -> bool:
     """Ask for confirmation."""
-    suffix = " [Y/n]" if default else " [y/N]"
-    response = console.input(f"{message}{suffix}: ").strip().lower()
+    suffix = " (y/n)"
+    response = console.input(f"{message} (y/n): ").strip().lower()
     if not response:
         return default
     return response in ("y", "yes")

@@ -2,7 +2,6 @@
 
 from dataclasses import dataclass
 
-
 TELEGRAM_API_BASE = "https://api.telegram.org/bot"
 
 

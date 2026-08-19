@@ -6,8 +6,16 @@ import httpx
 
 from stash.core.chunking import Chunk
 from stash.core.exceptions import ProviderAuthError, ProviderError, ProviderRateLimitError
+from stash.core.http_status import (
+    HTTP_BAD_REQUEST,
+    HTTP_FORBIDDEN,
+    HTTP_NOT_FOUND,
+    HTTP_OK,
+    HTTP_TOO_MANY_REQUESTS,
+    HTTP_UNAUTHORIZED,
+)
 from stash.core.storage import BaseStorageProvider, ProviderConfig, ProviderLimits, RemoteRef
-from stash.providers.telegram.auth import TelegramAuth, TELEGRAM_API_BASE
+from stash.providers.telegram.auth import TELEGRAM_API_BASE, TelegramAuth
 from stash.providers.telegram.limits import get_telegram_limits
 
 
@@ -20,6 +28,26 @@ class TelegramProvider(BaseStorageProvider):
         self.chat_id: str | None = None
         self._client: httpx.AsyncClient | None = None
         self._rate_limit_semaphore: asyncio.Semaphore | None = None
+
+    def _require_auth(self) -> TelegramAuth:
+        if self.auth is None:
+            raise ProviderError("Provider not initialized")
+        return self.auth
+
+    def _require_chat_id(self) -> str:
+        if self.chat_id is None:
+            raise ProviderError("Provider not initialized")
+        return self.chat_id
+
+    def _require_client(self) -> httpx.AsyncClient:
+        if self._client is None:
+            raise ProviderError("Provider not initialized")
+        return self._client
+
+    def _require_semaphore(self) -> asyncio.Semaphore:
+        if self._rate_limit_semaphore is None:
+            raise ProviderError("Rate limit semaphore not initialized")
+        return self._rate_limit_semaphore
 
     async def _initialize(self, config: ProviderConfig) -> None:
         """Initialize Telegram client and validate credentials."""
@@ -54,13 +82,13 @@ class TelegramProvider(BaseStorageProvider):
             json={"chat_id": self.chat_id},
         )
 
-        if response.status_code == 401:
+        if response.status_code == HTTP_UNAUTHORIZED:
             raise ProviderAuthError("Invalid Telegram bot token")
-        if response.status_code == 400:
+        if response.status_code == HTTP_BAD_REQUEST:
             raise ProviderAuthError("Chat not found or bot not a member")
-        if response.status_code == 403:
+        if response.status_code == HTTP_FORBIDDEN:
             raise ProviderAuthError("Bot not a member of the chat")
-        if response.status_code != 200:
+        if response.status_code != HTTP_OK:
             raise ProviderError(f"Failed to validate chat: {response.status_code} - {response.text}")
 
     async def upload_chunk(self, chunk: Chunk, remote_path: str) -> RemoteRef:
@@ -93,12 +121,12 @@ class TelegramProvider(BaseStorageProvider):
         self, response: httpx.Response, chunk_index: int, remote_path: str
     ) -> RemoteRef:
         """Handle upload response and extract message ID."""
-        if response.status_code == 429:
+        if response.status_code == HTTP_TOO_MANY_REQUESTS:
             retry_after = response.json().get("parameters", {}).get("retry_after", 1)
             await asyncio.sleep(retry_after)
             raise ProviderRateLimitError(f"Rate limited, retry after {retry_after}s")
 
-        if response.status_code != 200:
+        if response.status_code != HTTP_OK:
             raise ProviderError(f"Upload failed: {response.status_code} - {response.text}")
 
         data = response.json()
@@ -123,27 +151,28 @@ class TelegramProvider(BaseStorageProvider):
 
     async def download_chunk(self, remote_ref: RemoteRef) -> bytes:
         """Download a chunk from Telegram."""
-        if not self._client:
-            raise ProviderError("Provider not initialized")
+        client = self._require_client()
+        semaphore = self._require_semaphore()
+        auth = self._require_auth()
 
         file_id = remote_ref.remote_id
         if not file_id:
             raise ProviderError("Missing file_id in remote reference")
 
-        async with self._rate_limit_semaphore:
+        async with semaphore:
             # Get file info to get file path
-            response = await self._client.post(
+            response = await client.post(
                 "getFile",
                 json={"file_id": file_id},
             )
 
-            if response.status_code == 404:
+            if response.status_code == HTTP_NOT_FOUND:
                 raise ProviderError("File not found")
-            if response.status_code == 429:
+            if response.status_code == HTTP_TOO_MANY_REQUESTS:
                 retry_after = response.json().get("parameters", {}).get("retry_after", 1)
                 await asyncio.sleep(retry_after)
                 raise ProviderRateLimitError(f"Rate limited, retry after {retry_after}s")
-            if response.status_code != 200:
+            if response.status_code != HTTP_OK:
                 raise ProviderError(f"Download failed: {response.status_code} - {response.text}")
 
             data = response.json()
@@ -153,37 +182,39 @@ class TelegramProvider(BaseStorageProvider):
             file_path = data["result"]["file_path"]
 
             # Download the actual file
-            file_url = f"https://api.telegram.org/file/bot{self.auth.bot_token}/{file_path}"
-            file_response = await self._client.get(file_url)
+            file_url = f"https://api.telegram.org/file/bot{auth.bot_token}/{file_path}"
+            file_response = await client.get(file_url)
 
-            if file_response.status_code != 200:
+            if file_response.status_code != HTTP_OK:
                 raise ProviderError(f"File download failed: {file_response.status_code}")
 
             return file_response.content
 
     async def delete_chunk(self, remote_ref: RemoteRef) -> None:
         """Delete a chunk (message) from Telegram."""
-        if not self._client:
-            raise ProviderError("Provider not initialized")
+        client = self._require_client()
+        semaphore = self._require_semaphore()
+        chat_id = self._require_chat_id()
 
         message_id = remote_ref.metadata.get("message_id")
         if not message_id:
             raise ProviderError("Missing message_id in remote reference")
 
-        async with self._rate_limit_semaphore:
-            response = await self._client.post(
+        async with semaphore:
+            response = await client.post(
                 "deleteMessage",
-                json={"chat_id": self.chat_id, "message_id": int(message_id)},
+                json={"chat_id": chat_id, "message_id": int(message_id)},
             )
-            if response.status_code != 200:
+            if response.status_code != HTTP_OK:
                 data = response.json()
-                if not data.get("ok") and data.get("error_code") != 400:  # 400 = message not found
+                if not data.get("ok") and data.get("error_code") != HTTP_BAD_REQUEST:  # 400 = message not found
                     raise ProviderError(f"Delete failed: {response.status_code} - {response.text}")
 
     async def list_chunks(self, prefix: str) -> list[RemoteRef]:
         """List chunks by searching messages (limited by Telegram API)."""
-        if not self._client or not self.chat_id:
-            raise ProviderError("Provider not initialized")
+        client = self._require_client()
+        semaphore = self._require_semaphore()
+        chat_id = self._require_chat_id()
 
         refs: list[RemoteRef] = []
 
@@ -195,19 +226,19 @@ class TelegramProvider(BaseStorageProvider):
 
         while True:
             params = {
-                "chat_id": self.chat_id,
+                "chat_id": chat_id,
                 "limit": limit,
                 "offset": offset,
             }
 
-            async with self._rate_limit_semaphore:
-                response = await self._client.post("getChatHistory", json=params)
+            async with semaphore:
+                response = await client.post("getChatHistory", json=params)
 
-            if response.status_code == 429:
+            if response.status_code == HTTP_TOO_MANY_REQUESTS:
                 retry_after = response.json().get("parameters", {}).get("retry_after", 1)
                 await asyncio.sleep(retry_after)
                 continue
-            if response.status_code != 200:
+            if response.status_code != HTTP_OK:
                 raise ProviderError(f"List failed: {response.status_code} - {response.text}")
 
             data = response.json()

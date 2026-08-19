@@ -16,8 +16,8 @@ MAX_CHUNK_SIZE: int = 2 * 1024 * 1024 * 1024
 class ChunkConfig:
     """Chunking configuration."""
     chunk_size: int = DEFAULT_CHUNK_SIZE
-    min_chunk_size: int = field(default=MIN_CHUNK_SIZE, init=False)
-    max_chunk_size: int = field(default=MAX_CHUNK_SIZE, init=False)
+    min_chunk_size: int = field(default=MIN_CHUNK_SIZE, init=True)
+    max_chunk_size: int = field(default=MAX_CHUNK_SIZE, init=True)
 
     def __post_init__(self) -> None:
         if not (self.min_chunk_size <= self.chunk_size <= self.max_chunk_size):

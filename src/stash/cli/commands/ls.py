@@ -1,6 +1,5 @@
 """CLI command: ls - List stored files."""
 
-from pathlib import Path
 
 import click
 
