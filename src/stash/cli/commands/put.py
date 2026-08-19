@@ -150,6 +150,7 @@ async def _put_async(
                 provider=provider_name,
                 remote_id=remote_ref.remote_id,
                 nonce=b"",
+                metadata=remote_ref.metadata,
             )
             progress.advance(task)
 

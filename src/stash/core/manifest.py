@@ -127,6 +127,7 @@ class ManifestBuilder:
         provider: str,
         remote_id: str,
         nonce: bytes,
+        metadata: dict[str, str] | None = None,
     ) -> None:
         """Add a chunk to the manifest."""
         self.chunks.append(ChunkInfo(
@@ -137,6 +138,7 @@ class ManifestBuilder:
             provider=provider,
             remote_id=remote_id,
             nonce=nonce,
+            metadata=metadata or {},
         ))
 
     def build(self) -> FileManifest:

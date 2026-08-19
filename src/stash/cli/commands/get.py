@@ -119,7 +119,7 @@ async def _get_async(
             remote_ref = type('RemoteRef', (), {
                 'provider': chunk_info.provider,
                 'remote_id': chunk_info.remote_id,
-                'metadata': {'message_id': chunk_info.metadata.get('message_id', '')}
+                'metadata': chunk_info.metadata
             })()
 
             encrypted_data = await provider.download_chunk(remote_ref)
