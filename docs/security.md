@@ -2,7 +2,7 @@
 
 ## Overview
 
-Stash is designed with a **zero-knowledge** security model. The storage providers (Telegram, Discord, etc.) only ever receive encrypted, opaque data blobs. They cannot decrypt, inspect, or modify your data.
+Stashify is designed with a **zero-knowledge** security model. The storage providers (Telegram, Discord, etc.) only ever receive encrypted, opaque data blobs. They cannot decrypt, inspect, or modify your data.
 
 ## Encryption
 
@@ -15,13 +15,15 @@ Stash is designed with a **zero-knowledge** security model. The storage provider
 ### Key Hierarchy
 
 ```
-User Password
-    ↓ PBKDF2 (100,000 iterations) / Argon2id (planned)
-Master Key (32 bytes)
-    ↓ HKDF-SHA256 (salt: file_key_salt)
-File Key (32 bytes per file)
-    ↓ HKDF-SHA256 (info: "stash-chunk-{index}")
-Chunk Key (32 bytes per chunk)
+Repository Master Key (RMK)
+    │
+    ├── File Encryption Key 1 (derived from RMK + file_id)
+    ├── File Encryption Key 2
+    └── File Encryption Key N
+        │
+        ├── Chunk Key 0 (derived from file_key + chunk_index)
+        ├── Chunk Key 1
+        └── Chunk Key N
 ```
 
 ### Chunk Encryption
@@ -32,12 +34,17 @@ Each chunk is independently encrypted:
 3. Encrypt with AES-256-GCM: `ciphertext = AES-GCM(chunk_key, nonce, plaintext, aad=None)`
 4. Store: `nonce (12 bytes) + ciphertext + tag (16 bytes)`
 
-### Key Wrapping
+### File Key Derivation
 
-File keys are wrapped with the user's password:
-1. Derive wrapping key: `HKDF-SHA256(password, salt=16_bytes, info="stash-key-wrap")`
-2. Encrypt file key: `AES-GCM(wrapping_key, nonce, file_key)`
-3. Store: `salt (16) + nonce (12) + ciphertext + tag (16)`
+Per-file encryption keys are derived from the RMK:
+1. Derive file key: `HKDF-SHA256(RMK, salt=file_id, info="stash-file-key")`
+2. File key is 32 bytes (AES-256)
+
+### Filename Encryption
+
+Filenames are encrypted using the file key:
+1. Derive filename key: `HKDF-SHA256(file_key, info="stash-filename")`
+2. Encrypt with AES-256-GCM
 
 ## Integrity
 
@@ -57,15 +64,36 @@ File keys are wrapped with the user's password:
 
 ## Key Management
 
-### Password Handling
-- Never stored, only used for key derivation
-- Zeroized from memory after use
-- Minimum 8 characters recommended
+### Repository Master Key (RMK)
 
-### Key Rotation (Planned)
-- Periodic master key rotation
-- Re-encryption of file keys
-- Automatic re-encryption on access
+The RMK is the root key for the repository:
+- Generated once during `stash init` (32 random bytes)
+- Stored in OS credential store (Windows Credential Manager, macOS Keychain, Linux secret-service)
+- Never written to disk
+- Accessed via `keyring` library
+
+### Recovery Key
+
+The RMK itself serves as the **recovery key**:
+- Displayed once during `stash init`
+- Must be saved securely by the user
+- Used to unlock repository on new devices via `stash key-commands unlock --recovery-key <hex>`
+
+### Key Storage
+
+| Component | Storage | Encryption |
+|-----------|---------|------------|
+| RMK | OS keyring (CredMan/Keychain/secret-service) | Encrypted by OS |
+| File keys | Derived on-the-fly from RMK + file_id | Not stored |
+| Chunk keys | Derived on-the-fly from file_key + chunk_index | Not stored |
+| Provider credentials | `.stash/config.json` | Plaintext (OS file permissions) |
+| Recovery key | User-managed (offline) | User responsibility |
+
+### Lock / Unlock
+
+- `stash key-commands lock` — removes RMK from keyring
+- `stash key-commands unlock --recovery-key <hex>` — restores RMK
+- `stash key-commands status` — shows current lock state
 
 ## Provider Security
 
@@ -86,14 +114,14 @@ File keys are wrapped with the user's password:
 - All provider communication over HTTPS/TLS
 - Certificate validation enforced
 - No plaintext credentials in transit
-- Token storage: encrypted in local config
+- Token storage: local config (OS file permissions)
 
 ## Threat Model
 
 ### Trusted
 - Local machine (user's device)
-- User password/credentials
-- Stash binary (if verified)
+- User recovery key (if backed up)
+- Stashify binary (if verified)
 
 ### Untrusted
 - Storage providers (Telegram, Discord, etc.)
@@ -104,7 +132,6 @@ File keys are wrapped with the user's password:
 - Local malware/keyloggers
 - Physical device access
 - Side-channel attacks
-- Password brute force (mitigated by strong passwords)
 
 ## Provider Compromise Scenarios
 
@@ -117,11 +144,11 @@ File keys are wrapped with the user's password:
 
 ## Key Rotation (Planned)
 
-1. Generate new master key
-2. Re-wrap all file keys
+1. Generate new RMK
+2. Re-wrap all file keys with new RMK
 3. Re-encrypt filenames
-4. Atomic manifest update
-5. Old keys zeroized
+5. Atomic manifest update
+6. Old keys zeroized
 
 ## Compliance Considerations
 
