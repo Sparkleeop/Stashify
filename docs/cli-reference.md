@@ -81,8 +81,9 @@ stash put <file> [options]
 |--------|-------------|
 | `--provider, -p` | Specific provider to use |
 | `--chunk-size` | Chunk size in bytes (default: provider limit) |
-| `--strategy` | Distribution: single, split, balanced, replicated |
 | `--confirm/--no-confirm` | Skip confirmation prompt |
+
+> **Note:** Distribution strategy is currently always "single" (all chunks on one provider). Additional strategies (split, balanced, replicated) are planned.
 
 ### `stash get`
 Retrieve a file from Stash (uses RMK from keyring — no password prompt).
