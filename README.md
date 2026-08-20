@@ -302,7 +302,7 @@ Local metadata is stored in SQLite.
 
 ---
 
-# Terminal UI
+# Terminal UI (planned)
 
 Stashify is designed to have a full interactive terminal interface rather than being limited to traditional commands.
 
@@ -328,34 +328,6 @@ The interface is designed around a keyboard-first workflow with:
 * Search
 * Command palette
 * Keyboard shortcuts
-
-Conceptually:
-
-```text
-┌──────────────────────────────────────────────────────────────────────┐
-│ STASHIFY                                      Telegram ● Discord ●    │
-├──────────────────────────────┬───────────────────────────────────────┤
-│ LOCAL                        │ REMOTE STORAGE                         │
-│                              │                                       │
-│ ~/                           │ Stash                                 │
-│                              │                                       │
-│ > Documents/                 │ > Documents/                           │
-│   Downloads/                 │   Projects/                            │
-│   Pictures/                  │   Backups/                             │
-│                              │                                       │
-│ [x] project.zip              │ project.zip    2.4 GB    T+D    ✓     │
-│ [ ] README.md                │ backup.tar     14 GB     T      ✓     │
-│ [ ] photo.png                │ movie.mkv      8.1 GB    T+D    ✓     │
-│                              │                                       │
-├──────────────────────────────┴───────────────────────────────────────┤
-│ TRANSFERS                                                            │
-│ project.zip  ↑ 78%  ███████████████░░░░  Telegram + Discord         │
-├──────────────────────────────────────────────────────────────────────┤
-│ ↑↓ Navigate   Tab Pane   Space Select   U Upload   D Download   ?    │
-└──────────────────────────────────────────────────────────────────────┘
-```
-
-The TUI and traditional CLI share the same underlying storage engine.
 
 ---
 
@@ -404,8 +376,8 @@ The exact command set may evolve during development.
 
 | Provider         | Status         |
 | ---------------- | -------------- |
-| Telegram         | In development |
-| Discord          | Planned        |
+| Telegram         | Implemented    |
+| Discord          | Implemented    |
 | S3-compatible    | Planned        |
 | Backblaze B2     | Planned        |
 | Google Drive     | Planned        |
@@ -482,11 +454,6 @@ The codebase is intended to remain publicly auditable.
 At a high level:
 
 ```text
-                         ┌───────────────┐
-                         │   Stashify    │
-                         │      TUI      │
-                         └───────┬───────┘
-                                 │
                          ┌───────▼───────┐
                          │      CLI      │
                          └───────┬───────┘
@@ -536,14 +503,13 @@ The architecture is being actively developed and APIs may change significantly.
 | ---------------------- | ----------- |
 | Project architecture   | In progress |
 | Python CLI             | In progress |
-| TUI                    | In progress |
-| Encryption             | In progress |
-| Chunking               | In progress |
-| Manifest / metadata    | In progress |
+| Encryption             | Implemented |
+| Chunking               | Implemented |
+| Manifest / metadata    | Implemented |
 | Provider abstraction   | In progress |
-| Telegram provider      | In progress |
-| Discord provider       | Planned     |
-| Async job engine       | In progress |
+| Telegram provider      | Implemented |
+| Discord provider       | Implemented |
+| Async job engine       | Implemented |
 | Resumable transfers    | Planned     |
 | Multi-provider routing | Planned     |
 | Verification           | Planned     |
@@ -565,7 +531,6 @@ A typical architecture is:
 ```text
 UI
  │
- ├── TUI
  └── CLI
       │
       ▼
@@ -613,17 +578,16 @@ The long-term goal is to turn Stashify into a flexible encrypted storage layer t
 
 ### Near term
 
-* [ ] Core encryption pipeline
-* [ ] Chunking
+* [x] Core encryption pipeline
+* [x] Chunking
 * [ ] SQLite metadata
-* [ ] Telegram provider
-* [ ] Interactive TUI
-* [ ] Async transfer system
+* [x] Telegram provider
+* [x] Discord provider
+* [x] Async transfer system
 * [ ] Resumable uploads
 
 ### Medium term
 
-* [ ] Discord provider
 * [ ] Multi-provider routing
 * [ ] Replication
 * [ ] Integrity verification
