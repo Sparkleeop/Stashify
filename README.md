@@ -613,17 +613,16 @@ The long-term goal is to turn Stashify into a flexible encrypted storage layer t
 
 ### Near term
 
-* [ ] Core encryption pipeline
-* [ ] Chunking
+* [x] Core encryption pipeline
+* [x] Chunking
 * [ ] SQLite metadata
-* [ ] Telegram provider
-* [ ] Interactive TUI
-* [ ] Async transfer system
+* [x] Telegram provider
+* [x] Discord provider
+* [x] Async transfer system
 * [ ] Resumable uploads
 
 ### Medium term
 
-* [ ] Discord provider
 * [ ] Multi-provider routing
 * [ ] Replication
 * [ ] Integrity verification
