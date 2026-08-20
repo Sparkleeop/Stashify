@@ -98,6 +98,24 @@ The RMK is stored in the OS credential store:
 
 No passwords or raw keys are stored in configuration files.
 
+## Key Management
+
+The **Repository Master Key (RMK)** is managed by the OS keyring:
+
+| Command | Description |
+|---------|-------------|
+| `stash key-commands status` | Show key management status |
+| `stash key-commands lock` | Remove RMK from keyring (lock repo) |
+| `stash key-commands unlock --recovery-key <hex>` | Restore RMK from recovery key |
+| `stash key-commands recovery` | Show RMK for backup |
+
+The RMK is stored in the OS credential store:
+- **Windows**: Credential Manager
+- **macOS**: Keychain
+- **Linux**: secret-service (GNOME Keyring, KWallet, etc.)
+
+No passwords or raw keys are stored in configuration files.
+
 ## Environment Variables
 
 | Variable | Description |
