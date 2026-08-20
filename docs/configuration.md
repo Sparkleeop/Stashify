@@ -78,31 +78,25 @@ stash provider add telegram \
 | `chat_id` | Chat/channel ID for storage | Yes | - |
 | `max_concurrent` | Max concurrent uploads | No | `3` |
 
-## Global Settings
 
-Create `.stash/config.toml` for global defaults:
 
-```toml
-[storage]
-default_provider = "telegram"
-default_chunk_size = 10485760  # 10MB
-replication_factor = 1
+## Key Management
 
-[transfers]
-upload_concurrency = 3
-download_concurrency = 3
-retry_count = 3
-retry_backoff = 1.0
+The **Repository Master Key (RMK)** is managed by the OS keyring:
 
-[security]
-auto_lock_timeout = 0  # 0 = never
-key_derivation_iterations = 100000
+| Command | Description |
+|---------|-------------|
+| `stash key-commands status` | Show key management status |
+| `stash key-commands lock` | Remove RMK from keyring (lock repo) |
+| `stash key-commands unlock --recovery-key <hex>` | Restore RMK from recovery key |
+| `stash key-commands recovery` | Show RMK for backup |
 
-[ui]
-compact_mode = false
-animations = true
-progress_style = "bar"
-```
+The RMK is stored in the OS credential store:
+- **Windows**: Credential Manager
+- **macOS**: Keychain
+- **Linux**: secret-service (GNOME Keyring, KWallet, etc.)
+
+No passwords or raw keys are stored in configuration files.
 
 ## Key Management
 
