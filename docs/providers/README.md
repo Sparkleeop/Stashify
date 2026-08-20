@@ -1,34 +1,34 @@
 # Storage Providers
 
-Stashify uses a provider abstraction to support multiple storage backends. Each provider implements the `StorageProvider` interface.
+Stash uses a provider abstraction to support multiple storage backends. Each provider implements the `StorageProvider` interface.
 
 ## Supported Providers
 
 | Provider | Status | Max File | Max Chunk | Rate Limit |
 |----------|--------|----------|-----------|------------|
-| [Discord](discord.md) | ✅ Stable | 25 MB | 10 MB | 5 req/s |
 | [Telegram](telegram.md) | ✅ Stable | 20 MB | 10 MB | 30 req/s |
-| [S3/MinIO](s3.md) | 🚧 Planned | Unlimited | Configurable | AWS limits |
-| [Google Drive](gdrive.md) | 🚧 Planned | Unlimited | Configurable | API limits |
-| [S3/MinIO](s3.md) | 🚧 Planned | Unlimited | Configurable | AWS limits |
-| [Backblaze B2](b2.md) | 🚧 Planned | Unlimited | Configurable | B2 limits |
-| [WebDAV](webdav.md) | 🚧 Planned | Unlimited | Configurable | Server limits |
-| [Local FS](local.md) | 🚧 Planned | Unlimited | Configurable | Disk I/O |
+| [Discord](discord.md) | ✅ Stable | 25 MB | 10 MB | 5 req/s |
+| S3/MinIO | 🚧 Planned | Unlimited | Configurable | AWS limits |
+| Google Drive | 🚧 Planned | Unlimited | Configurable | API limits |
+| S3/MinIO | 🚧 Planned | Unlimited | Configurable | AWS limits |
+| Backblaze B2 | 🚧 Planned | Unlimited | Configurable | B2 limits |
+| WebDAV | 🚧 Planned | Unlimited | Configurable | Server limits |
+| Local FS | 🚧 Planned | Unlimited | Configurable | Disk I/O |
 
 ## Adding a Provider
 
 ```bash
-stashify provider add <name> --type <type> [options]
+stash provider add <name> --type <type> [options]
 ```
 
 ### List Providers
 ```bash
-stashify provider list
+stash provider list
 ```
 
 ### Remove Provider
 ```bash
-stashify provider remove <name> [--force]
+stash provider remove <name> [--force]
 ```
 
 ## Provider Interface
@@ -53,12 +53,11 @@ Each provider has specific credentials and settings stored in `.stash/config.jso
 ```json
 {
   "providers": {
-    "discord": {
-      "type": "discord",
+    "telegram": {
+      "type": "telegram",
       "credentials": {
         "token": "bot_token",
-        "channel_id": "123456789",
-        "is_bot": "true"
+        "chat_id": "-1001234567890"
       },
       "settings": {
         "max_concurrent": "3"
@@ -73,8 +72,8 @@ Each provider has specific credentials and settings stored in `.stash/config.jso
 1. Create a new directory under `src/stash/providers/<name>/`
 2. Implement `StorageProvider` interface
 3. Add auth, limits, and provider modules
-4. Register in `src/stash/providers/__init__.py`
-5. Update CLI provider command
+3. Register in `src/stash/providers/__init__.py`
+4. Update CLI provider command
 5. Add tests
 
 ## Provider Limits

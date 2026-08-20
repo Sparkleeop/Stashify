@@ -1,6 +1,6 @@
 # Telegram Provider
 
-Stashify's Telegram provider stores encrypted file chunks as documents in a Telegram chat/channel using a bot.
+Stash's Telegram provider stores encrypted file chunks as documents in a Telegram chat/channel using a bot.
 
 ## Setup
 
@@ -22,10 +22,10 @@ Stashify's Telegram provider stores encrypted file chunks as documents in a Tele
 2. Forward message from channel to [@userinfobot](https://t.me/userinfobot)
 3. Copy the Chat ID (negative number for channels: `-1001234567890`)
 
-### 3. Configure Stashify
+### 3. Configure Stash
 
 ```bash
-stashify provider add telegram \
+stash provider add telegram \
   --token <BOT_TOKEN> \
   --chat-id -1001234567890 \
   --max-concurrent 3
@@ -61,7 +61,7 @@ stashify provider add telegram \
 ## Configuration
 
 ```bash
-stashify provider add telegram \
+stash provider add telegram \
   --token <BOT_TOKEN> \
   --chat-id -1001234567890 \
   --max-concurrent 3
@@ -101,7 +101,7 @@ For files > 20 MB:
 ## Configuration
 
 ```bash
-stashify provider add telegram \
+stash provider add telegram \
   --name my_telegram \
   --token <BOT_TOKEN> \
   --chat-id -1001234567890 \

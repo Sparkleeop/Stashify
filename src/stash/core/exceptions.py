@@ -64,3 +64,8 @@ class ConfigurationError(StashError):
 class ValidationError(StashError):
     """Input validation errors."""
     pass
+
+
+class KeyManagementError(StashError):
+    """Key management errors (RMK, keyring, etc.)."""
+    pass

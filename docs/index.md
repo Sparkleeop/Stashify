@@ -1,6 +1,6 @@
-# Stashify Documentation
+# Stashify
 
-**Stashify** is a privacy-focused CLI storage system that uses third-party platforms (Discord, Telegram) as encrypted storage backends.
+**Stashify** is a privacy-focused CLI storage system that uses third-party platforms (Telegram, Discord) as encrypted storage backends.
 
 ## Quick Start
 
@@ -8,17 +8,17 @@
 # Install
 pip install stashify
 
-# Initialize repository
-stashify --repo /path/to/repo init
+# Initialize repository (generates RMK, stores in OS keyring)
+stash init
 
 # Add storage provider
-stashify --repo /path/to/repo provider add tg --type telegram --token <bot_token> --chat-id <chat_id>
+stash provider add telegram --token <bot_token> --chat-id <chat_id>
 
-# Store a file
-stashify --repo /path/to/repo put file.txt --password secret
+# Store a file (no password prompt — uses RMK from keyring)
+stash put file.txt
 
 # Retrieve a file
-stashify --repo /path/to/repo get file.txt --password secret
+stash get file.txt
 ```
 
 ## Documentation
@@ -34,7 +34,8 @@ stashify --repo /path/to/repo get file.txt --password secret
 ## Features
 
 - **Client-side encryption**: AES-256-GCM with per-file keys
-- **Multi-provider support**: Discord, Telegram (S3, B2, Google Drive planned)
+- **Repository Master Key (RMK) hierarchy**: Keys stored in OS keyring
+- **Multi-provider support**: Telegram, Discord (S3, B2, Google Drive planned)
 - **Chunked storage**: Automatic chunking for large files
 - **Multi-provider distribution**: Single, split, balanced, replicated strategies
 - **Resumable uploads**: Resume interrupted transfers
@@ -45,8 +46,8 @@ stashify --repo /path/to/repo get file.txt --password secret
 
 | Provider | Max File Size | Chunk Size | Status |
 |----------|---------------|------------|--------|
-| Discord  | 25 MB         | 10 MB      | ✅ Stable |
 | Telegram | 20 MB         | 10 MB      | ✅ Stable |
+| Discord  | 25 MB         | 10 MB      | ✅ Stable |
 | S3/MinIO | Unlimited     | Configurable | 🚧 Planned |
 | Google Drive | Unlimited  | Configurable | 🚧 Planned |
 
@@ -54,8 +55,8 @@ stashify --repo /path/to/repo get file.txt --password secret
 
 - **AES-256-GCM** encryption per chunk
 - **HKDF-SHA256** key derivation per chunk
-- Per-file encryption keys with HKDF-SHA256 derivation
-- Argon2id password-based key derivation (planned)
+- **Repository Master Key (RMK)** hierarchy stored in OS keyring
+- Per-file encryption keys derived from RMK + file ID
 - Zero-knowledge: providers never see plaintext
 
 ## License

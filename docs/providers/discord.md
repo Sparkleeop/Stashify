@@ -1,6 +1,6 @@
 # Discord Provider
 
-Stashify's Discord provider stores encrypted file chunks as message attachments in a Discord channel using a bot.
+Stash's Discord provider stores encrypted file chunks as message attachments in a Discord channel using a bot.
 
 ## Setup
 
@@ -17,12 +17,12 @@ Stashify's Discord provider stores encrypted file chunks as message attachments 
 
 1. Enable **Developer Mode** in Discord (User Settings → Advanced → Developer Mode)
 2. Right-click the channel → "Copy Channel ID"
-7. Channel ID format: `123456789012345678`
+3. Channel ID format: `123456789012345678`
 
-### 3. Configure Stashify
+### 3. Configure Stash
 
 ```bash
-stashify provider add discord \
+stash provider add discord \
   --token <BOT_TOKEN> \
   --channel-id 123456789012345678 \
   --is-bot true \
@@ -32,7 +32,7 @@ stashify provider add discord \
 ## How It Works
 
 1. **File Upload**:
-   - File is encrypted and chunked (default 10MB chunks)
+   - File encrypted and chunked (default 10MB chunks)
    - Each chunk uploaded as Discord message attachment
    - Message content: `stash-chunk:<file_id>:<chunk_index>`
    - Attachment filename: `<file_id>/chunk-<index>.bin`
@@ -59,7 +59,7 @@ stashify provider add discord \
 ## Configuration
 
 ```bash
-stashify provider add discord \
+stash provider add discord \
   --name my_discord \
   --token <BOT_TOKEN> \
   --channel-id 123456789012345678 \

@@ -14,7 +14,7 @@ COPY src/ ./src/
 
 # Build the package
 RUN pip install --no-cache-dir build && \
-    python -m build --wheel --no-isolation
+    python -m build --wheel
 
 # Runtime stage
 FROM python:3.11-slim

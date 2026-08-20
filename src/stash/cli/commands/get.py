@@ -6,7 +6,8 @@ from pathlib import Path
 import click
 
 from stash.cli.output import create_progress, format_size, print_error, print_info, print_success
-from stash.core.crypto import CryptoEngine, EncryptionConfig
+from stash.core.crypto import CryptoEngine
+from stash.core.keymanager import KeyManager
 from stash.core.metadata import MetadataStore
 from stash.providers import ProviderRegistry
 
@@ -14,23 +15,22 @@ from stash.providers import ProviderRegistry
 @click.command()
 @click.argument("file_id_or_name")
 @click.option("--output", "-o", type=click.Path(path_type=Path), help="Output path (default: current directory)")
-@click.option("--password", prompt=True, hide_input=True, help="Encryption password")
 @click.option("--overwrite", is_flag=True, help="Overwrite existing file")
 @click.pass_context
-def get_cmd(ctx: click.Context, file_id_or_name: str, output: Path | None, password: str, overwrite: bool) -> None:
+def get_cmd(ctx: click.Context, file_id_or_name: str, output: Path | None, overwrite: bool) -> None:
     """Retrieve a file from Stash."""
-    asyncio.run(_get_async(file_id_or_name, ctx.obj["repo"], output, password, overwrite))
+    asyncio.run(_get_async(file_id_or_name, ctx.obj["repo"], output, overwrite))
 
 
 async def _get_async(
     file_id_or_name: str,
     repo_path: Path,
     output: Path | None,
-    password: str,
     overwrite: bool,
 ) -> None:
     repo = repo_path.resolve()
     store = MetadataStore(repo)
+    keymanager = KeyManager(repo)
 
     file_id = _resolve_file_id(store, file_id_or_name)
     if not file_id:
@@ -39,33 +39,19 @@ async def _get_async(
 
     manifest = store.load_manifest(file_id)
 
-    # Decrypt filename
-    crypto = CryptoEngine()
-    enc_config = EncryptionConfig(
-        algorithm=manifest.encryption.algorithm,
-        key_size=manifest.encryption.key_size,
-        nonce_size=manifest.encryption.nonce_size,
-        chunk_key_derivation=manifest.encryption.chunk_key_derivation,
-    )
-    file_key = None
+    # Get RMK from keyring
     try:
-        if manifest.encryption.file_key_wrapped:
-            from stash.core.crypto import FileKey
-            file_key = FileKey(
-                key=crypto.decrypt_file_key(
-                    manifest.encryption.file_key_wrapped,
-                    password,
-                    enc_config
-                ).key,
-                salt=manifest.encryption.file_key_salt,
-                config=enc_config
-            )
-        else:
-            print_error("File key not wrapped - cannot decrypt")
-            return
+        rmk = keymanager.get_rmk()
     except Exception as e:
-        print_error(f"Failed to decrypt file key: {e}")
+        print_error(f"Failed to retrieve RMK: {e}")
+        print_info("Run 'stash unlock' if this is a new device")
         return
+
+    crypto = CryptoEngine()
+
+    # Derive file key from RMK and file_id
+    file_id_bytes = file_id.encode()
+    file_key = crypto.derive_file_key_from_rmk(rmk, file_id_bytes)
 
     # Decrypt filename
     from stash.core.crypto import EncryptedChunk

@@ -12,17 +12,18 @@ from stash.core.manifest import (
     DistributionStrategy,
     generate_file_id,
 )
-from stash.core.crypto import CryptoEngine, FileKey
+from stash.core.crypto import CryptoEngine
 
 
 def _make_builder(file_id: str, original_name: str, size: int = 1000):
-    """Create a ManifestBuilder with encrypted filename."""
-    engine = CryptoEngine()
-    file_key = engine.generate_file_key()
+    """Create a ManifestBuilder with encrypted filename using RMK."""
     crypto = CryptoEngine()
-    encrypted_name_chunk = crypto.encrypt_chunk(original_name.encode(), file_key, -1)
-    encrypted_name = encrypted_name_chunk.ciphertext.hex()
-    encrypted_name_nonce = encrypted_name_chunk.nonce
+    rmk = b"0" * 32  # dummy RMK
+    file_key = crypto.generate_file_key(rmk)
+    
+    ciphertext, nonce = crypto.encrypt_filename(original_name.encode(), file_key)
+    encrypted_name = ciphertext.hex()
+    encrypted_name_nonce = nonce
     
     enc = EncryptionInfo(
         algorithm="AES-256-GCM",
@@ -36,7 +37,7 @@ def _make_builder(file_id: str, original_name: str, size: int = 1000):
         file_id=file_id,
         original_name=original_name,
         encrypted_name=encrypted_name,
-        encrypted_name_nonce=encrypted_name_nonce,
+        encrypted_name_nonce=nonce,
         original_size=size,
         chunk_size=1024,
         encryption=enc,

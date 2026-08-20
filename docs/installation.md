@@ -2,7 +2,7 @@
 
 ## Prerequisites
 
-- Python 3.11+
+- Python 3.12+
 - pip (Python package manager)
 
 ## Install from PyPI
@@ -30,21 +30,21 @@ pip install -e ".[dev]"
 ## Verify Installation
 
 ```bash
-stashify --help
-stashify --version
+stash --help
+stash --version
 ```
 
 ## Shell Completion
 
 ```bash
 # Bash
-stashify --install-completion bash
+stash --install-completion bash
 
 # Zsh
-stashify --install-completion zsh
+stash --install-completion zsh
 
 # Fish
-stashify --install-completion fish
+stash --install-completion fish
 ```
 
 ## Docker
@@ -56,7 +56,7 @@ docker run --rm -v /path/to/repo:/repo ghcr.io/sparkleeop/stashify:latest --repo
 
 ## Requirements
 
-- Python 3.11+
+- Python 3.12+
 - Dependencies are automatically installed via pip
 - Optional: Docker for containerized deployment
 
@@ -68,3 +68,32 @@ docker run --rm -v /path/to/repo:/repo ghcr.io/sparkleeop/stashify:latest --repo
 | macOS | ✅ Fully supported |
 | Windows | ✅ Fully supported |
 | Docker | ✅ Supported |
+
+## First Run: Initialize Repository
+
+After installation, you need to initialize a repository:
+
+```bash
+stash init
+```
+
+This will:
+1. Generate a cryptographically random **Repository Master Key (RMK)**
+2. Store the RMK securely in your OS credential store (Windows Credential Manager, macOS Keychain, Linux secret-service)
+3. Display a **recovery key (RMK hex)** — **SAVE THIS SECURELY!**
+
+The recovery key is the only way to unlock the repository on a new device or if the keyring entry is lost.
+
+## Configure a Provider
+
+After initialization, add at least one storage provider:
+
+```bash
+# Telegram
+stash provider add telegram --token <bot_token> --chat-id <chat_id>
+
+# Discord
+stash provider add discord --token <bot_token> --channel-id <channel_id>
+```
+
+See [Providers](providers/README.md) for detailed setup instructions.
