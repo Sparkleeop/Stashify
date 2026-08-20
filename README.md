@@ -1,11 +1,8 @@
-# Stashify
-
 <p align="center">
-  <a href="https://postimg.cc/7b9ByFRV">
-    <img src="https://i.postimg.cc/15hbDPcL/IMG-20260820-WA0006.jpg" alt="Stashify" width="700">
-  </a>
+  <img src="https://stashifylogo.tiiny.site/image0.png" alt="Stashify Logo" width="256">
 </p>
 
+# Stashify
 
 <p align="center">
   <strong>Encrypted storage. Your providers. Your keys.</strong>
@@ -16,13 +13,13 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/Sparkleeop/Stashify">
+  <a href="https://github.com/Sparkleeop/Stashify/stargazers">
     <img src="https://img.shields.io/github/stars/Sparkleeop/Stashify?style=flat-square" alt="GitHub Stars">
   </a>
-  <a href="https://github.com/Sparkleeop/Stashify">
+  <a href="https://github.com/Sparkleeop/Stashify/blob/main/LICENSE">
     <img src="https://img.shields.io/github/license/Sparkleeop/Stashify?style=flat-square" alt="License">
   </a>
-  <img src="https://img.shields.io/badge/Python-3.12+-3776AB?style=flat-square&logo=python&logoColor=white" alt="Python">
+  <img src="https://img.shields.io/badge/Python-3.12%2B-3776AB?style=flat-square&logo=python&logoColor=white" alt="Python">
   <img src="https://img.shields.io/badge/Status-Early%20Development-ee8695?style=flat-square" alt="Status">
 </p>
 
