@@ -12,7 +12,7 @@
 ## Commands
 
 ### `stash init`
-Initialize a new Stash repository.
+Initialize a new Stash repository (generates RMK, stores in OS keyring).
 
 ```bash
 stash init [--repo PATH] [--force]
@@ -22,6 +22,8 @@ stash init [--repo PATH] [--force]
 |--------|-------------|
 | `--repo, -r` | Repository path (default: current directory) |
 | `--force, -f` | Overwrite existing repository |
+
+**Output:** Shows Repository ID and Recovery Key (RMK hex) — **save the recovery key!**
 
 ### `stash provider`
 Manage storage providers.
@@ -69,7 +71,7 @@ stash provider remove <name> [--force]
 ```
 
 ### `stash put`
-Store a file in Stash.
+Store a file in Stash (uses RMK from keyring — no password prompt).
 
 ```bash
 stash put <file> [options]
@@ -80,11 +82,10 @@ stash put <file> [options]
 | `--provider, -p` | Specific provider to use |
 | `--chunk-size` | Chunk size in bytes (default: provider limit) |
 | `--strategy` | Distribution: single, split, balanced, replicated |
-| `--password` | Encryption password (prompt if not provided) |
 | `--confirm/--no-confirm` | Skip confirmation prompt |
 
 ### `stash get`
-Retrieve a file from Stash.
+Retrieve a file from Stash (uses RMK from keyring — no password prompt).
 
 ```bash
 stash get <file_id_or_name> [options]
@@ -93,7 +94,6 @@ stash get <file_id_or_name> [options]
 | Option | Description |
 |--------|-------------|
 | `--output, -o` | Output path (default: current directory) |
-| `--password` | Encryption password (prompt if not provided) |
 | `--overwrite` | Overwrite existing file |
 
 ### `stash ls`
@@ -144,6 +144,41 @@ Show overall repository status.
 stash status
 ```
 
+### `stash key-commands`
+Repository key management.
+
+#### `stash key-commands lock`
+Lock the repository by removing RMK from keyring.
+
+```bash
+stash key-commands lock
+```
+
+#### `stash key-commands unlock`
+Unlock the repository on a new device using a recovery key.
+
+```bash
+stash key-commands unlock --recovery-key <hex>
+```
+
+| Option | Description |
+|--------|-------------|
+| `--recovery-key` | Recovery key (RMK hex) to restore RMK |
+
+#### `stash key-commands status`
+Show key management status.
+
+```bash
+stash key-commands status
+```
+
+#### `stash key-commands recovery`
+Show the recovery key (RMK) for backup purposes.
+
+```bash
+stash key-commands recovery
+```
+
 ## Global Options
 
 | Option | Description |
@@ -164,3 +199,18 @@ stash status
 | 4 | Authentication failed |
 | 5 | Network error |
 | 6 | Storage limit exceeded |
+
+## Key Management Flow
+
+```
+First device:                    New device:
+stash init                       stash unlock --recovery-key <hex>
+  ↓                                 ↓
+Generate RMK                     Restore RMK to keyring
+  ↓                                 ↓
+Store in OS keyring              Ready to use
+  ↓
+Show recovery key (SAVE!)
+```
+
+**Important:** The recovery key (RMK hex) is shown **once** during `stash init`. Save it securely — it's the only way to unlock the repository on a new device.

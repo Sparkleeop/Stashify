@@ -3,7 +3,7 @@
 ## Installation
 
 ### `pip install` fails on Windows
-Ensure you have the latest `pip` and Python 3.9+:
+Ensure you have the latest `pip` and Python 3.12+:
 
 ```bash
 python -m pip install --upgrade pip
@@ -90,12 +90,29 @@ Discord rate limits are strict. Reduce concurrency:
 stash provider add discord --max-concurrent 2
 ```
 
-## Authentication
+## Key Management (RMK)
 
-### Password prompts fail
-- Stash uses `getpass`, which requires an interactive terminal
-- On Windows, use the built-in console (not some SSH/CI shells)
-- If automation is needed, use `--password` flag (less secure)
+### "RMK not found in keyring" / "Repository locked or key unavailable"
+The Repository Master Key (RMK) is not in the OS keyring. This happens when:
+- You're on a new device and haven't run `stash unlock`
+- You ran `stash key-commands lock` and haven't unlocked
+- The keyring entry was deleted
+
+**Fix:** Run `stash unlock --recovery-key <hex>` with your recovery key.
+
+### "Recovery key required" / "Invalid recovery key format"
+You must provide a valid 64-character hex recovery key (32 bytes = 64 hex chars):
+```bash
+stash key-commands unlock --recovery-key <64-char-hex>
+```
+
+### "Repository already unlocked"
+The RMK is already in the keyring. No action needed.
+
+### Lost recovery key
+**There is no recovery.** The RMK is the only way to unlock the repository. If you lose the recovery key and the RMK is not in the keyring, you cannot decrypt existing files. You must re-initialize the repository and re-upload files.
+
+## Provider Authentication
 
 ### "Authentication failed" on get
 1. Provider credentials may have changed (token revoked/rotated)
@@ -118,16 +135,6 @@ Stash stores manifests in `.stash/metadata/`. If corrupted:
 1. Check the JSON is valid
 2. Restore from backup if you have one
 3. Re-upload the file if all backups are gone
-
-## Encryption
-
-### "Decryption failed"
-1. Wrong password: verify the password you used with `put`
-2. Corrupted data: check provider messages are intact
-3. Wrong provider credentials: chunks may be from a different account
-
-### Lost password
-**There is no recovery.** Encryption keys are derived from your password and never stored. Re-upload files with a new password you can remember.
 
 ## Networking
 

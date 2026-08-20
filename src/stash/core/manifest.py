@@ -39,6 +39,8 @@ class EncryptionInfo:
     nonce_size: int
     chunk_key_derivation: str
     file_key_salt: bytes
+    # file_key_wrapped is no longer used with RMK-based system
+    # kept for backwards compatibility
     file_key_wrapped: bytes | None = None
 
 

@@ -8,6 +8,7 @@ from stash import __version__
 from stash.cli.commands.get import get_commands
 from stash.cli.commands.info import info_commands
 from stash.cli.commands.init import init_commands
+from stash.cli.commands.key import key_commands
 from stash.cli.commands.ls import ls_commands
 from stash.cli.commands.provider import provider_commands
 from stash.cli.commands.put import put_commands
@@ -37,6 +38,7 @@ main.add_command(info_commands)
 main.add_command(rm_commands)
 main.add_command(verify_commands)
 main.add_command(status_commands)
+main.add_command(key_commands)
 
 
 if __name__ == "__main__":

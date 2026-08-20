@@ -1,20 +1,20 @@
-# Stash
+# Stashify
 
-**Stash** is a privacy-focused CLI storage system that uses third-party platforms (Telegram, Discord) as encrypted storage backends.
+**Stashify** is a privacy-focused CLI storage system that uses third-party platforms (Telegram, Discord) as encrypted storage backends.
 
 ## Quick Start
 
 ```bash
 # Install
-pip install stash
+pip install stashify
 
-# Initialize repository
+# Initialize repository (generates RMK, stores in OS keyring)
 stash init
 
 # Add storage provider
 stash provider add telegram --token <bot_token> --chat-id <chat_id>
 
-# Store a file
+# Store a file (no password prompt — uses RMK from keyring)
 stash put file.txt
 
 # Retrieve a file
@@ -34,6 +34,7 @@ stash get file.txt
 ## Features
 
 - **Client-side encryption**: AES-256-GCM with per-file keys
+- **Repository Master Key (RMK) hierarchy**: Keys stored in OS keyring
 - **Multi-provider support**: Telegram, Discord (S3, B2, Google Drive planned)
 - **Chunked storage**: Automatic chunking for large files
 - **Multi-provider distribution**: Single, split, balanced, replicated strategies
@@ -54,7 +55,8 @@ stash get file.txt
 
 - **AES-256-GCM** encryption per chunk
 - **HKDF-SHA256** key derivation per chunk
-- Per-file encryption keys with HKDF-SHA256 derivation
+- **Repository Master Key (RMK)** hierarchy stored in OS keyring
+- Per-file encryption keys derived from RMK + file ID
 - Zero-knowledge: providers never see plaintext
 
 ## License

@@ -47,11 +47,26 @@ class CryptoEngine:
     def __init__(self, config: EncryptionConfig | None = None):
         self.config = config or EncryptionConfig()
 
-    def generate_file_key(self) -> FileKey:
-        """Generate a new per-file encryption key."""
+    def generate_file_key(self, rmk: bytes) -> FileKey:
+        """Generate a new per-file encryption key derived from RMK."""
         salt = secrets.token_bytes(SALT_SIZE)
-        master_key = secrets.token_bytes(self.config.key_size)
-        return FileKey(key=master_key, salt=salt, config=self.config)
+        file_key = self._derive_file_key(rmk, salt)
+        return FileKey(key=file_key, salt=salt, config=self.config)
+
+    def _derive_file_key(self, rmk: bytes, file_id: bytes) -> bytes:
+        """Derive a file encryption key from RMK and file ID."""
+        hkdf = HKDF(
+            algorithm=hashes.SHA256(),
+            length=self.config.key_size,
+            salt=file_id,
+            info=b"stash-file-key",
+        )
+        return hkdf.derive(rmk)
+
+    def derive_file_key_from_rmk(self, rmk: bytes, file_id: bytes) -> FileKey:
+        """Derive a FileKey from RMK and file ID."""
+        file_key = self._derive_file_key(rmk, file_id)
+        return FileKey(key=file_key, salt=file_id, config=self.config)
 
     def derive_chunk_key(self, file_key: FileKey, chunk_index: int) -> bytes:
         """Derive a per-chunk key from the file key."""
@@ -83,39 +98,31 @@ class CryptoEngine:
         except Exception as e:
             raise CryptoError(f"Decryption failed for chunk {encrypted.chunk_index}: {e}") from e
 
-    def encrypt_file_key(self, file_key: FileKey, password: str) -> bytes:
-        """Encrypt a file key with a password (for key wrapping)."""
-        salt = secrets.token_bytes(SALT_SIZE)
+    def encrypt_filename(self, filename: bytes, file_key: FileKey) -> tuple[bytes, bytes]:
+        """Encrypt a filename using the file key."""
         hkdf = HKDF(
             algorithm=hashes.SHA256(),
             length=self.config.key_size,
-            salt=salt,
-            info=b"stash-key-wrap",
+            salt=file_key.salt,
+            info=b"stash-filename",
         )
-        wrapping_key = hkdf.derive(password.encode())
-        aesgcm = AESGCM(wrapping_key)
+        filename_key = hkdf.derive(file_key.key)
         nonce = secrets.token_bytes(self.config.nonce_size)
-        ciphertext = aesgcm.encrypt(nonce, file_key.key, None)
-        return salt + nonce + ciphertext
+        aesgcm = AESGCM(filename_key)
+        ciphertext = aesgcm.encrypt(nonce, filename, None)
+        return ciphertext, nonce
 
-    def decrypt_file_key(self, wrapped: bytes, password: str, config: EncryptionConfig) -> FileKey:
-        """Decrypt a file key with a password."""
-        # wrapped format: salt (16) + nonce (12) + ciphertext
-        if len(wrapped) < SALT_SIZE + config.nonce_size + TAG_SIZE:
-            raise CryptoError("Invalid wrapped key format")
-        salt = wrapped[:SALT_SIZE]
-        nonce = wrapped[SALT_SIZE:SALT_SIZE + config.nonce_size]
-        ciphertext = wrapped[SALT_SIZE + config.nonce_size:]
+    def decrypt_filename(self, ciphertext: bytes, nonce: bytes, file_key: FileKey) -> bytes:
+        """Decrypt a filename using the file key."""
         hkdf = HKDF(
             algorithm=hashes.SHA256(),
-            length=config.key_size,
-            salt=salt,
-            info=b"stash-key-wrap",
+            length=self.config.key_size,
+            salt=file_key.salt,
+            info=b"stash-filename",
         )
-        wrapping_key = hkdf.derive(password.encode())
-        aesgcm = AESGCM(wrapping_key)
+        filename_key = hkdf.derive(file_key.key)
+        aesgcm = AESGCM(filename_key)
         try:
-            key = aesgcm.decrypt(nonce, ciphertext, None)
-            return FileKey(key=key, salt=salt, config=config)
+            return aesgcm.decrypt(nonce, ciphertext, None)
         except Exception as e:
-            raise CryptoError(f"Key unwrapping failed: {e}") from e
+            raise CryptoError(f"Filename decryption failed: {e}") from e
