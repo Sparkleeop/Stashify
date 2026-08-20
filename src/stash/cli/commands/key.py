@@ -3,6 +3,7 @@
 import click
 
 from stash.cli.output import print_error, print_info, print_success, print_warning
+from stash.core.exceptions import KeyManagementError
 from stash.core.keymanager import KeyManager
 
 
@@ -36,8 +37,9 @@ def unlock_cmd(ctx: click.Context, recovery_key: str | None) -> None:
     repo = ctx.obj["repo"].resolve()
     keymanager = KeyManager(repo)
 
-    if keymanager.has_repository_identity():
-        print_info("Repository already unlocked")
+    identity = keymanager.get_repository_identity()
+    if identity is None:
+        print_error("Repository not initialized. Run 'stash init' first.")
         return
 
     if not recovery_key:
@@ -55,8 +57,16 @@ def unlock_cmd(ctx: click.Context, recovery_key: str | None) -> None:
         print_error("Recovery key must be 32 bytes (64 hex characters)")
         return
 
+    # Check if already unlocked
     try:
-        identity = keymanager.unlock_repository(rmk_bytes)
+        keymanager.get_rmk()
+        print_info("Repository already unlocked")
+        return
+    except KeyManagementError:
+        pass  # Not unlocked, proceed with unlock
+
+    try:
+        keymanager.unlock_repository(rmk_bytes)
         print_success("Repository unlocked successfully")
         print_info(f"Repository ID: {identity.repository_id}")
     except Exception as e:

@@ -157,24 +157,23 @@ class KeyManager:
 
     def unlock_repository(self, recovery_key: bytes) -> RepositoryIdentity:
         """Unlock repository using a recovery key."""
-        if self.has_repository_identity():
-            raise KeyManagementError("Repository already initialized")
+        identity = self.get_repository_identity()
+        if identity is None:
+            raise KeyManagementError("Repository not initialized. Run 'stash init' first.")
 
-        repo_id = secrets.token_hex(16)
+        # Check if RMK is already available in keyring
+        username = f"stash:{identity.repository_id}"
+        existing = keyring.get_password(SERVICE_NAME, username)
+        if existing is not None:
+            raise KeyManagementError("Repository already unlocked")
 
-        username = f"stash:{repo_id}"
-
+        # Store recovery key as RMK
+        username = f"stash:{identity.repository_id}"
         try:
             keyring.set_password(SERVICE_NAME, username, recovery_key.hex())
         except Exception as e:
             raise KeyManagementError(f"Failed to store RMK in keyring: {e}") from e
 
-        identity = RepositoryIdentity(
-            repository_id=repo_id,
-            created_at=time.time(),
-            version=1,
-        )
-        self._save_identity(identity)
         return identity
 
     def change_repository_id(self, new_repo_id: str) -> None:
