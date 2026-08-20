@@ -10,6 +10,7 @@ from stash.cli.output import create_progress, format_size, print_error, print_in
 from stash.core.chunking import ChunkConfig, Chunker
 from stash.core.crypto import CryptoEngine
 from stash.core.jobs import JobConfig
+from stash.core.keymanager import KeyManager
 from stash.core.manifest import (
     DistributionStrategy,
     EncryptionInfo,
@@ -26,12 +27,11 @@ from stash.providers import ProviderRegistry
 @click.option("--provider", help="Specific provider to use (default: first available)")
 @click.option("--chunk-size", type=int, help="Chunk size in bytes (default: provider limit)")
 @click.option("--strategy", type=click.Choice(["single", "split", "balanced", "replicated"]), default="single", help="Distribution strategy")
-@click.option("--password", prompt=True, hide_input=True, help="Encryption password")
 @click.option("--confirm/--no-confirm", default=True, help="Confirm before upload")
 @click.pass_context
-def put_cmd(ctx: click.Context, file_path: Path, provider: str | None, chunk_size: int | None, strategy: str, password: str, confirm: bool) -> None:
+def put_cmd(ctx: click.Context, file_path: Path, provider: str | None, chunk_size: int | None, strategy: str, confirm: bool) -> None:
     """Store a file in Stash."""
-    asyncio.run(_put_async(file_path, ctx.obj["repo"], provider, chunk_size, strategy, password, confirm))
+    asyncio.run(_put_async(file_path, ctx.obj["repo"], provider, chunk_size, strategy, confirm))
 
 
 async def _put_async(
@@ -40,11 +40,11 @@ async def _put_async(
     provider_name: str | None,
     chunk_size: int | None,
     strategy: str,
-    password: str,
     do_confirm: bool,
 ) -> None:
     repo = repo_path.resolve()
     store = MetadataStore(repo)
+    keymanager = KeyManager(repo)
 
     providers = store.list_providers()
     if not providers:
@@ -72,14 +72,23 @@ async def _put_async(
         print_info("Cancelled")
         return
 
-    crypto = CryptoEngine()
-    file_key = crypto.generate_file_key()
-    wrapped_key = crypto.encrypt_file_key(file_key, password)
+    # Get RMK from keyring
+    try:
+        rmk = keymanager.get_rmk()
+    except Exception as e:
+        print_error(f"Failed to retrieve RMK: {e}")
+        print_info("Run 'stash unlock' if this is a new device")
+        return
 
-    # Encrypt the filename
-    encrypted_name_chunk = crypto.encrypt_chunk(file_path.name.encode(), file_key, -1)
-    encrypted_name = encrypted_name_chunk.ciphertext.hex()
-    encrypted_name_nonce = encrypted_name_chunk.nonce
+    crypto = CryptoEngine()
+    file_id = generate_file_id()
+    file_key = crypto.generate_file_key(rmk)
+
+    # Encrypt the filename using the file key
+    encrypted_name_ciphertext, encrypted_name_nonce = crypto.encrypt_filename(
+        file_path.name.encode(), file_key
+    )
+    encrypted_name = encrypted_name_ciphertext.hex()
 
     provider_configs = {}
     for name in provider_names:
@@ -109,21 +118,21 @@ async def _put_async(
         nonce_size=12,
         chunk_key_derivation="HKDF-SHA256",
         file_key_salt=file_key.salt,
-        file_key_wrapped=wrapped_key,
+        file_key_wrapped=None,
     )
 
     builder = ManifestBuilder(
-        file_id=generate_file_id(),
+        file_id=file_id,
         original_name=file_path.name,
         encrypted_name=encrypted_name,
         encrypted_name_nonce=encrypted_name_nonce,
-        original_size=file_size,
+        original_size=file_path.stat().st_size,
         chunk_size=effective_chunk_size,
         encryption=encryption_info,
         strategy=dist_strategy,
     )
 
-    print_info(f"Processing {num_chunks} chunks ({format_size(effective_chunk_size)} each)...")
+    print_info(f"Processing {num_chunks} chunks...")
 
     JobConfig(max_workers=min(4, num_chunks))
 
@@ -132,45 +141,48 @@ async def _put_async(
     progress = create_progress()
     task = progress.add_task("Uploading", total=num_chunks)
 
-    from stash.core.chunking import Chunk
-
-    async def upload_chunk(chunk: Chunk, provider_name: str) -> None:
+    async def upload_chunk(chunk_data: bytes, chunk_index: int, provider_name: str) -> tuple[bytes, dict[str, str]]:
+        """Encrypt and upload a single chunk."""
         async with semaphores[provider_name]:
-            # Use opaque identifier: file_id + chunk index (no filename)
-            remote_path = f"{builder.file_id}/chunk-{chunk.index:06d}"
-            remote_ref = await provider_instances[provider_name].upload_chunk(chunk, remote_path)
-            checksum = compute_checksum(chunk.data)
-            builder.add_chunk(
-                index=chunk.index,
-                size=chunk.size,
-                encrypted_size=len(remote_ref.metadata.get("size", "0")),
-                checksum=checksum,
-                provider=provider_name,
-                remote_id=remote_ref.remote_id,
-                nonce=encrypted.nonce,
-                metadata=remote_ref.metadata,
-            )
-            progress.advance(task)
-
-    with progress:
-        for chunk in chunker.chunk_file(file_path):
-            encrypted = crypto.encrypt_chunk(chunk.data, file_key, chunk.index)
-            encrypted_chunk = type(chunk)(
-                index=chunk.index,
+            encrypted = crypto.encrypt_chunk(chunk_data, file_key, chunk_index)
+            remote_path = f"{file_id}/chunk-{chunk_index:06d}"
+            from stash.core.chunking import Chunk
+            encrypted_chunk = Chunk(
+                index=chunk_index,
                 data=encrypted.ciphertext,
-                offset=chunk.offset,
+                offset=0,
                 size=len(encrypted.ciphertext),
-                is_last=chunk.is_last,
+                is_last=False,
             )
+            remote_ref = await provider_instances[provider_name].upload_chunk(encrypted_chunk, remote_path)
+            return encrypted.nonce, remote_ref.metadata
 
-            if dist_strategy == DistributionStrategy.SINGLE:
-                target = provider_names[0]
-            elif dist_strategy == DistributionStrategy.SPLIT:
-                target = provider_names[chunk.index % len(provider_names)]
-            else:
-                target = provider_names[0]
+    progress = create_progress()
+    task = progress.add_task("Uploading", total=num_chunks)
 
-            await upload_chunk(encrypted_chunk, target)
+    for chunk in chunker.chunk_file(file_path):
+        checksum = compute_checksum(chunk.data)
+
+        if dist_strategy == DistributionStrategy.SINGLE:
+            target = provider_names[0]
+        elif dist_strategy == DistributionStrategy.SPLIT:
+            target = provider_names[chunk.index % len(provider_names)]
+        else:
+            target = provider_names[0]
+
+        nonce, metadata = await upload_chunk(chunk.data, chunk.index, target)
+
+        builder.add_chunk(
+            index=chunk.index,
+            size=chunk.size,
+            encrypted_size=len(metadata.get("size", "0")),
+            checksum=checksum,
+            provider=target,
+            remote_id=metadata.get("remote_id", ""),
+            nonce=nonce,
+            metadata=metadata,
+        )
+        progress.advance(task)
 
     manifest = builder.build()
     store.save_manifest(manifest)
