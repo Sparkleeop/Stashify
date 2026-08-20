@@ -92,7 +92,7 @@ jobs:
           docker build -t stash:test .
       - name: Test Docker image
         run: |
-          docker run --rm stash:test stash --help
+          docker run --rm stash:test --help
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
