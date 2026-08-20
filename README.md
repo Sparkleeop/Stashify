@@ -1,6 +1,10 @@
 # Stashify
 
-[![IMG-20260820-WA0006.jpg](https://i.postimg.cc/15hbDPcL/IMG-20260820-WA0006.jpg)](https://postimg.cc/7b9ByFRV)
+<p align="center">
+  <a href="https://postimg.cc/7b9ByFRV">
+    <img src="https://i.postimg.cc/15hbDPcL/IMG-20260820-WA0006.jpg" alt="Stashify" width="700">
+  </a>
+</p>
 
 
 <p align="center">
