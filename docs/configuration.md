@@ -2,7 +2,7 @@
 
 ## Repository Configuration
 
-Each Stash repository stores its configuration in `.stash/config.json`:
+Each Stashify repository stores its configuration in `.stash/config.json`:
 
 ```json
 {
@@ -22,6 +22,18 @@ Each Stash repository stores its configuration in `.stash/config.json`:
   }
 }
 ```
+
+The repository identity (including RMK reference) is stored in `.stash/identity.json`:
+
+```json
+{
+  "repository_id": "abc123...",
+  "created_at": 1699999999.123,
+  "version": 1
+}
+```
+
+The **Repository Master Key (RMK)** is stored in the OS credential store, not in config files.
 
 ## Global Options
 
@@ -66,38 +78,49 @@ stash provider add telegram \
 | `chat_id` | Chat/channel ID for storage | Yes | - |
 | `max_concurrent` | Max concurrent uploads | No | `3` |
 
-## Global Settings
 
-Create `.stash/config.toml` for global defaults:
 
-```toml
-[storage]
-default_provider = "telegram"
-default_chunk_size = 10485760  # 10MB
-replication_factor = 1
+## Key Management
 
-[transfers]
-upload_concurrency = 3
-download_concurrency = 3
-retry_count = 3
-retry_backoff = 1.0
+The **Repository Master Key (RMK)** is managed by the OS keyring:
 
-[security]
-auto_lock_timeout = 0  # 0 = never
-key_derivation_iterations = 100000
+| Command | Description |
+|---------|-------------|
+| `stash key-commands status` | Show key management status |
+| `stash key-commands lock` | Remove RMK from keyring (lock repo) |
+| `stash key-commands unlock --recovery-key <hex>` | Restore RMK from recovery key |
+| `stash key-commands recovery` | Show RMK for backup |
 
-[ui]
-compact_mode = false
-animations = true
-progress_style = "bar"
-```
+The RMK is stored in the OS credential store:
+- **Windows**: Credential Manager
+- **macOS**: Keychain
+- **Linux**: secret-service (GNOME Keyring, KWallet, etc.)
+
+No passwords or raw keys are stored in configuration files.
+
+## Key Management
+
+The **Repository Master Key (RMK)** is managed by the OS keyring:
+
+| Command | Description |
+|---------|-------------|
+| `stash key-commands status` | Show key management status |
+| `stash key-commands lock` | Remove RMK from keyring (lock repo) |
+| `stash key-commands unlock --recovery-key <hex>` | Restore RMK from recovery key |
+| `stash key-commands recovery` | Show RMK for backup |
+
+The RMK is stored in the OS credential store:
+- **Windows**: Credential Manager
+- **macOS**: Keychain
+- **Linux**: secret-service (GNOME Keyring, KWallet, etc.)
+
+No passwords or raw keys are stored in configuration files.
 
 ## Environment Variables
 
 | Variable | Description |
 |----------|-------------|
 | `STASH_REPO` | Default repository path |
-| `STASH_PASSWORD` | Default encryption password (not recommended) |
 | `STASH_VERBOSE` | Enable verbose output |
 | `DISCORD_TOKEN` | Default Discord bot token |
 | `TELEGRAM_TOKEN` | Default Telegram bot token |
@@ -118,4 +141,5 @@ Each provider has built-in limits:
 | Algorithm | AES-256-GCM | Encryption algorithm |
 | Key Size | 256 bits | Encryption key size |
 | Chunk Key Derivation | HKDF-SHA256 | Per-chunk key derivation |
-| Key Derivation | HKDF-SHA256 | Per-file key derivation |
+| File Key Derivation | HKDF-SHA256 | Per-file key derivation from RMK |
+| RMK Derivation | HKDF-SHA256 | File key derivation from RMK + file_id |

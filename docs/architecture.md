@@ -2,13 +2,13 @@
 
 ## Overview
 
-Stash is a privacy-focused CLI storage system that uses third-party platforms as encrypted storage backends. The architecture is designed around a provider-agnostic core with pluggable storage backends.
+Stashify is a privacy-focused CLI storage system that uses third-party platforms as encrypted storage backends. The architecture is designed around a provider-agnostic core with pluggable storage backends.
 
 ## Core Components
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                        Stash CLI                              │
+│                        Stashify CLI                           │
 ├─────────────────────────────────────────────────────────────┤
 │  Commands (put, get, ls, info, rm, verify, status, etc.)    │
 ├─────────────────────────────────────────────────────────────┤
@@ -29,11 +29,20 @@ Stash is a privacy-focused CLI storage system that uses third-party platforms as
 ## Core Modules
 
 ### Crypto Engine (`src/stash/core/crypto.py`)
-- **AES-256-GCM** encryption for chunks
+- **AES-256-GCM** encryption for chunks and filenames
 - **HKDF-SHA256** key derivation
-- Per-file encryption keys with HKDF-SHA256 derivation
-- Per-chunk keys derived via HKDF from file key
-- Password-based key wrapping with Argon2id (planned)
+- **Repository Master Key (RMK)** based key hierarchy
+- File keys derived from RMK + file_id via HKDF-SHA256
+- Chunk keys derived from file key + chunk_index via HKDF-SHA256
+- Filename encryption via dedicated filename key
+- No password-based key wrapping (RMK replaces password-based system)
+
+### Key Manager (`src/stash/core/keymanager.py`)
+- **Repository Master Key (RMK)** management using OS keyring
+- RMK generation, storage, retrieval via `keyring` library
+- OS credential store integration (CredMan/Keychain/secret-service)
+- RMK locking/unlocking with recovery key support
+- Repository identity management
 
 ### Chunking Manager (`src/stash/core/chunking.py`)
 - Configurable chunk sizes (default 10MB)
@@ -101,20 +110,23 @@ File → Encrypt → Chunk → Per-chunk encrypt → Upload to providers → Sav
 ```
 
 1. **File Input** → Read file stream
-2. **Encryption** → Generate file key, encrypt filename
+2. **Key Retrieval** → Get RMK from OS keyring
+3. **File Key Derivation** → HKDF-SHA256(RMK, file_id)
+3. **Filename Encryption** → Encrypt with file key
 4. **Chunking** → Split into configurable chunks (default 10MB)
-5. **Per-Chunk Encryption** → HKDF-derived per-chunk key + AES-256-GCM
+4. **Per-Chunk Encryption** → HKDF-derived per-chunk key + AES-256-GCM
 5. **Provider Upload** → Parallel upload to configured providers
 7. **Manifest Creation** → Store metadata, chunk mappings, encryption params
 8. **Persist** → Save manifest to local metadata store
 
 ### Download Flow
 ```
-Manifest → Decrypt filename → Resolve chunks → Download from providers → Decrypt → Reconstruct
+Manifest → Get RMK from keyring → Derive file key → Decrypt filename → Resolve chunks → Download from providers → Decrypt → Reconstruct
 ```
 
 1. **Manifest Lookup** → Load file metadata
-4. **Key Derivation** → Decrypt file key with password
+2. **RMK Retrieval** → Get RMK from OS keyring
+4. **File Key Derivation** → HKDF-SHA256(RMK, file_id)
 4. **Filename Decryption** → Decrypt original filename
 5. **Chunk Resolution** → Determine providers for each chunk
 6. **Parallel Download** → Fetch chunks from providers
@@ -141,7 +153,7 @@ Manifest → Decrypt filename → Resolve chunks → Download from providers →
 ## Security Model
 
 ### Threat Model
-- **Trusted**: Local machine, user password
+- **Trusted**: Local machine, user recovery key
 - **Untrusted**: Storage providers, network
 - **Assumption**: Provider may be malicious/curious
 
@@ -149,18 +161,25 @@ Manifest → Decrypt filename → Resolve chunks → Download from providers →
 - **Confidentiality**: AES-256-GCM encryption
 - **Integrity**: GCM authentication tags + SHA-256 checksums
 - **Forward Secrecy**: Per-file keys, per-chunk keys
-- **Provider Isolation**: Providers cannot decrypt without user password
+- **Provider Isolation**: Providers cannot decrypt without RMK
 
 ### Key Hierarchy
 ```
-User Password
-    ↓ Argon2id (planned) / PBKDF2
-Master Key
-    ↓ HKDF-SHA256
-File Key (per file)
-    ↓ HKDF-SHA256
-Chunk Key (per chunk)
+Repository Master Key (RMK)
+    │
+    ├── File Encryption Key 1 (HKDF-SHA256(RMK, file_id))
+    ├── File Encryption Key 2
+    └── File Encryption Key N
+        │
+        ├── Chunk Key 0 (HKDF-SHA256(file_key, "stash-chunk-0"))
+        ├── Chunk Key 1
+        └── Chunk Key N
 ```
+
+- RMK: 32 random bytes, generated at `stash init`, stored in OS keyring
+- File keys: HKDF-SHA256(RMK, salt=file_id, info="stash-file-key")
+- Chunk keys: HKDF-SHA256(file_key, info="stash-chunk-{index}")
+- Filename keys: HKDF-SHA256(file_key, info="stash-filename")
 
 ## Error Handling
 
