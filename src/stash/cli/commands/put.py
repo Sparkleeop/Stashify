@@ -31,12 +31,11 @@ from stash.providers import ProviderRegistry
 @click.option("--provider", help="Specific provider to use (default: first available)")
 @click.option("--chunk-size", type=int, help="Chunk size in bytes (default: provider limit)")
 @click.option("--strategy", type=click.Choice(["single", "split", "balanced", "replicated"]), default="single", help="Distribution strategy")
-@click.option("--confirm/--no-confirm", default=True, help="Confirm before upload")
 @click.option("--resume", is_flag=True, help="Resume an incomplete upload")
 @click.option("--file-id", help="File ID to resume (required with --resume if multiple incomplete uploads exist)")
 @click.option("--confirm/--no-confirm", default=True, help="Confirm before upload")
 @click.pass_context
-def put_cmd(ctx: click.Context, file_path: Path, provider: str | None, chunk_size: int | None, strategy: str, confirm: bool, resume: bool, file_id: str | None) -> None:
+def put_cmd(ctx: click.Context, file_path: Path, provider: str | None, chunk_size: int | None, strategy: str, resume: bool, file_id: str | None, confirm: bool) -> None:
     """Store a file in Stash."""
     asyncio.run(_put_async(file_path, ctx.obj["repo"], provider, chunk_size, strategy, confirm, resume, file_id))
 
@@ -123,7 +122,7 @@ async def _put_async(
         # Verify file matches
         if existing_manifest.original_size != file_path.stat().st_size:
             print_error("File size does not match the incomplete upload")
-            return
+            raise SystemExit(1)
 
         # Verify file content matches (check first chunk checksum if available)
         if existing_manifest.chunks:
@@ -132,7 +131,7 @@ async def _put_async(
             first_checksum = compute_checksum(first_chunk_data)
             if existing_manifest.chunks[0].checksum != first_checksum:
                 print_error("File content does not match the incomplete upload")
-                return
+                raise SystemExit(1)
 
         file_id = existing_manifest.file_id
         file_key = crypto.derive_file_key_from_rmk(rmk, file_id.encode())
@@ -317,7 +316,8 @@ async def _put_async(
                 is_last=False,
             )
             remote_ref = await provider_instances[provider_name].upload_chunk(encrypted_chunk, remote_path)
-            return encrypted.nonce, remote_ref.metadata
+            # Return nonce and a dict with remote_id and metadata
+            return encrypted.nonce, {"remote_id": remote_ref.remote_id, "metadata": remote_ref.metadata}  # type: ignore[dict-item]
 
     progress = create_progress()
     task = progress.add_task("Uploading", total=num_chunks)
@@ -355,7 +355,9 @@ async def _put_async(
         )
         store.save_manifest(builder.build())
 
-        nonce, metadata = await upload_chunk(c.data, c.index, target)
+        nonce, upload_result = await upload_chunk(c.data, c.index, target)
+        remote_id: str = upload_result["remote_id"]
+        metadata: dict[str, str] = upload_result["metadata"]  # type: ignore[assignment]
 
         # Update chunk as uploaded
         builder.chunks[c.index] = ChunkInfo(
@@ -364,7 +366,7 @@ async def _put_async(
             encrypted_size=len(metadata.get("size", "0")),
             checksum=checksum,
             provider=target,
-            remote_id=metadata.get("remote_id", ""),
+            remote_id=remote_id,
             nonce=nonce,
             metadata=metadata,
             status=ChunkStatus.UPLOADED,
